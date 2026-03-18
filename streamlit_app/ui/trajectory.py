@@ -1,7 +1,9 @@
 """Trajectory computation and display for Economics Pricing Q-learning demo."""
 
 from __future__ import annotations
+import os
 import numpy as np
+import pandas as pd
 import streamlit as st
 from streamlit_app.state_econ import (
     profit1,
@@ -11,7 +13,135 @@ from streamlit_app.state_econ import (
     argmax_tie,
 )
 
-__all__ = ["render_trajectory_econ"]
+__all__ = ["render_trajectory_econ", "render_experiment_log"]
+
+# ---------- Experiment Log ----------
+
+EXPERIMENT_LOG_KEY = "experiment_log"
+
+
+def _csv_path() -> str:
+    """Return path to experiments CSV file."""
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "experiments.csv")
+
+
+def _get_log() -> list[dict]:
+    """Get experiment log from session state, loading from CSV on first access."""
+    if EXPERIMENT_LOG_KEY not in st.session_state:
+        path = _csv_path()
+        if os.path.exists(path):
+            try:
+                df = pd.read_csv(path)
+                st.session_state[EXPERIMENT_LOG_KEY] = df.to_dict("records")
+            except Exception:
+                st.session_state[EXPERIMENT_LOG_KEY] = []
+        else:
+            st.session_state[EXPERIMENT_LOG_KEY] = []
+    return st.session_state[EXPERIMENT_LOG_KEY]
+
+
+def save_experiment(tab_id: str, delta_1: float, delta_2: float,
+                    cycle_length: int, avg_p1: float, avg_p2: float,
+                    avg_profit_1: float, avg_profit_2: float,
+                    start_p1: float = 0.0, start_p2: float = 0.0,
+                    cycle_prices: str = "",
+                    transient_prices: str = "") -> None:
+    """Save an experiment result to the log."""
+    log = _get_log()
+    exp = {
+        "run": len(log) + 1,
+        "alpha": st.session_state.get(f"{tab_id}_cfg_alpha", ""),
+        "gamma": st.session_state.get(f"{tab_id}_cfg_delta", ""),
+        "beta": f"{st.session_state.get(f'{tab_id}_cfg_beta', 0):.1e}",
+        "k2": st.session_state.get(f"{tab_id}_cfg_k2", ""),
+        "m": st.session_state.get(f"{tab_id}_cfg_m", ""),
+        "p_e": round(st.session_state.get(f"{tab_id}_cfg_p_e", 0), 2),
+        "p_c": round(st.session_state.get(f"{tab_id}_cfg_p_c", 0), 2),
+        "steps": st.session_state.get(f"{tab_id}_step_count", 0),
+        "start_p1": round(start_p1, 2),
+        "start_p2": round(start_p2, 2),
+        "cycle_len": cycle_length,
+        "cycle": cycle_prices,
+        "avg_p1": round(avg_p1, 2),
+        "avg_p2": round(avg_p2, 2),
+        "avg_pi1": round(avg_profit_1, 2),
+        "avg_pi2": round(avg_profit_2, 2),
+        "Delta1": round(delta_1, 3),
+        "Delta2": round(delta_2, 3),
+        "path": transient_prices,
+    }
+    log.append(exp)
+    # Auto-save to CSV
+    _save_csv(log)
+
+
+def _save_csv(log: list[dict]) -> None:
+    """Save experiment log to CSV file."""
+    path = _csv_path()
+    if not log:
+        if os.path.exists(path):
+            os.remove(path)
+        return
+    pd.DataFrame(log).to_csv(path, index=False)
+
+
+def delete_experiment(index: int) -> None:
+    """Delete an experiment from the log by index."""
+    log = _get_log()
+    if 0 <= index < len(log):
+        log.pop(index)
+        # Renumber
+        for i, exp in enumerate(log):
+            exp["run"] = i + 1
+        _save_csv(log)
+
+
+def render_experiment_log() -> None:
+    """Render the experiment log table with delete buttons."""
+    log = _get_log()
+    if not log:
+        return
+
+    st.markdown("---")
+    st.subheader("Experiment Log")
+    st.caption("Use the Download button below to save your experiment log.")
+
+    df = pd.DataFrame(log)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    # Action buttons
+    col_del, col_clear, col_download, col_spacer = st.columns([1, 1, 1, 2])
+    with col_del:
+        delete_idx = st.number_input(
+            "Delete run #",
+            min_value=1,
+            max_value=len(log),
+            value=len(log),
+            step=1,
+            key="delete_exp_idx",
+        )
+        if st.button("Delete", key="delete_exp_btn"):
+            delete_experiment(int(delete_idx) - 1)
+            st.rerun()
+    with col_clear:
+        st.markdown("")  # spacing
+        st.markdown("")  # spacing
+        if st.button("Clear All", key="clear_exp_btn"):
+            st.session_state[EXPERIMENT_LOG_KEY] = []
+            _save_csv([])
+            st.rerun()
+    with col_download:
+        st.markdown("")  # spacing
+        st.markdown("")  # spacing
+        csv_data = pd.DataFrame(log).to_csv(index=False)
+        st.download_button(
+            "Download CSV",
+            data=csv_data,
+            file_name="experiments.csv",
+            mime="text/csv",
+            key="download_exp_btn",
+        )
 
 
 def greedy_successor_econ(
@@ -111,47 +241,40 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
         return
     prices_display = [f"{p:.1f}" for p in prices]
 
-    st.subheader("Greedy Trajectory")
+    st.subheader("Pricing Simulation")
     st.markdown(
-        rf"""Compute the greedy trajectory starting from a given pair of prices.
-        <br>
-        The trajectory follows the best-response actions for both players until a cycle is detected.<br>
-        <br>
-        Pick from the action space $A$ = {{{', '.join(prices_display)}}}.
-        """,
-        unsafe_allow_html=True,
+        rf"""After training, simulate the learned pricing strategies from any starting point.
+        Both firms follow their greedy (best-response) policy with no exploration.
+        Pick starting prices from $A$ = {{{', '.join(prices_display)}}}.
+        """
     )
-    # Check if Q-tables have been trained (need at least 1000 steps)
+    # Check if Q-tables have been trained
     step_count = st.session_state.get(f"{tab_id}_step_count", 0)
-    min_steps_required = 1000
-    if step_count < min_steps_required:
-        st.warning(
-            f"⚠️ The model needs to be trained for at least {min_steps_required:,} steps before computing greedy trajectories. "
-            f"Current steps: {step_count:,}. Please train the model first."
-        )
+    if step_count == 0:
+        st.info("Train the model first to compute pricing simulations.")
         return
 
     # Input fields for starting prices
     col1, col2 = st.columns(2)
     with col1:
         start_p1 = st.number_input(
-            r"Starting price for Alice ($p_1$):",
+            r"Starting price for AdrenaLine ($p_1$):",
             min_value=float(min(prices)),
             max_value=float(max(prices)),
             value=float(prices[len(prices) // 2]),
             step=0.1,
             key=f"{tab_id}_traj_p1",
-            help="Starting price for player 1 (Alice)",
+            help="Starting price for player 1 (AdrenaLine)",
         )
     with col2:
         start_p2 = st.number_input(
-            r"Starting price for Bob ($p_2$):",
+            r"Starting price for BuzzFuel ($p_2$):",
             min_value=float(min(prices)),
             max_value=float(max(prices)),
             value=float(prices[len(prices) // 2]),
             step=0.1,
             key=f"{tab_id}_traj_p2",
-            help="Starting price for player 2 (Bob)",
+            help="Starting price for player 2 (BuzzFuel)",
         )
 
     # Validate and normalize prices to exact values in PRICES list (handles floating-point precision)
@@ -171,7 +294,7 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
     start_p2 = min(prices, key=lambda p: abs(p - start_p2))
 
     # Button to compute trajectory
-    if st.button("Compute Greedy Trajectory", key=f"{tab_id}_compute_traj"):
+    if st.button("Simulate Pricing", key=f"{tab_id}_compute_traj", type="primary"):
         # Get Q-tables from session state
         Q1 = st.session_state.get(f"{tab_id}_Q1")
         Q2 = st.session_state.get(f"{tab_id}_Q2")
@@ -234,7 +357,7 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
                         }
                     )
 
-                # Build table data: rows are Alice, Bob, Step; columns are trajectory steps
+                # Build table data: rows are AdrenaLine, BuzzFuel, Step; columns are trajectory steps
                 alice_row = []
                 bob_row = []
                 step_row = []
@@ -255,11 +378,11 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
                     <table style="border-collapse: collapse; table-layout: fixed;">
                         <tbody>
                             <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">👩🏼‍💼 Alice p₁</td>
+                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">👩🏼‍💼 AdrenaLine p₁</td>
                                 {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in alice_row])}
                             </tr>
                             <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">🧑🏼‍💼 Bob p₂</td>
+                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">🧑🏼‍💼 BuzzFuel p₂</td>
                                 {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in bob_row])}
                             </tr>
                             <tr>
@@ -350,11 +473,11 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
                     <table style="border-collapse: collapse; table-layout: fixed;">
                         <tbody>
                             <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">👩🏼‍💼 Alice π₁</td>
+                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">👩🏼‍💼 AdrenaLine π₁</td>
                                 {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in alice_profit_row])}
                             </tr>
                             <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">🧑🏼‍💼 Bob π₂</td>
+                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">🧑🏼‍💼 BuzzFuel π₂</td>
                                 {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in bob_profit_row])}
                             </tr>
                             <tr>
@@ -378,8 +501,8 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
                 st.markdown(
                     f"""Cycle detected: starts at step {loop_start}, ends at step {loop_start + len(loop)-1}, length = {len(loop)}<br>
                     <br>
-                    The average price for Alice is {average_p1:.1f}, and for Bob is {average_p2:.1f};<br>
-                    and the average profit for Alice is {average_profit_alice:.2f}, and for Bob is {average_profit_bob:.2f}.<br>
+                    The average price for AdrenaLine is {average_p1:.1f}, and for BuzzFuel is {average_p2:.1f};<br>
+                    and the average profit for AdrenaLine is {average_profit_alice:.2f}, and for BuzzFuel is {average_profit_bob:.2f}.<br>
                     <br>
                     Remember that the equilibrium price is {p_e:.1f}, and the collusion price is {p_c:.1f}; 
                     <br>
@@ -398,16 +521,50 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
                     ) / denominator
                     st.markdown(
                         rf"""
-                        The normalised profit is calculated as the difference between the average profit and the equilibrium profit, 
+                        The normalised profit is calculated as the difference between the average profit and the equilibrium profit,
                         divided by the difference between collusion profit and equilibrium profit: <br>
                         $\Delta = \dfrac{{\pi_{{\text{{avg}}}} - \pi_{{\text{{equilibrium}}}}}}{{\pi_{{\text{{collusion}}}} - \pi_{{\text{{equilibrium}}}}}}$. <br>
                         <br>
                         Hence the normalised profit <br>
-                        for Alice is: $\Delta_{{\text{{Alice}}}} = \dfrac{{{average_profit_alice:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_alice:.2f}$, <br>
-                        and for Bob is: $\Delta_{{\text{{Bob}}}} = \dfrac{{{average_profit_bob:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_bob:.2f}$.<br>
+                        for AdrenaLine is: $\Delta_{{\text{{AdrenaLine}}}} = \dfrac{{{average_profit_alice:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_alice:.2f}$, <br>
+                        and for BuzzFuel is: $\Delta_{{\text{{BuzzFuel}}}} = \dfrac{{{average_profit_bob:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_bob:.2f}$.<br>
                         """,
                         unsafe_allow_html=True,
                     )
+
+                    # Auto-save to experiment log (once per simulation)
+                    # Build cycle string: (p1,p2) → (p1,p2) → ...
+                    cycle_str = " → ".join(
+                        f"({rec['a1_price']:.1f},{rec['a2_price']:.1f})"
+                        for rec in loop
+                    )
+                    # Build transient path: starting prices → ... → cycle start
+                    transient_steps = path[:loop_start] if loop_start else []
+                    transient_str = " → ".join(
+                        [f"({start_p1:.1f},{start_p2:.1f})"] +
+                        [f"({rec['a1_price']:.1f},{rec['a2_price']:.1f})"
+                         for rec in transient_steps]
+                    )
+
+                    save_key = f"{tab_id}_last_saved_sim"
+                    save_id = (st.session_state.get(f"{tab_id}_step_count", 0),
+                               start_p1, start_p2)
+                    if st.session_state.get(save_key) != save_id:
+                        save_experiment(
+                            tab_id,
+                            delta_1=normalized_profit_alice,
+                            delta_2=normalized_profit_bob,
+                            cycle_length=len(loop),
+                            avg_p1=average_p1,
+                            avg_p2=average_p2,
+                            avg_profit_1=average_profit_alice,
+                            avg_profit_2=average_profit_bob,
+                            start_p1=start_p1,
+                            start_p2=start_p2,
+                            cycle_prices=cycle_str,
+                            transient_prices=transient_str,
+                        )
+                        st.session_state[save_key] = save_id
                 else:
                     st.markdown(
                         r"""

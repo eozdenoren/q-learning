@@ -7,7 +7,6 @@ import streamlit as st
 from streamlit_app.state import jump_to_latest
 from streamlit_app.ui.controls import (
     inline_help,
-    playback_controls,
     playback_controls_econ,
 )
 from streamlit_app.state_econ import (
@@ -76,17 +75,15 @@ def handle_autoplay(
 def render_training_controls(
     config: dict,
     display_state: dict,
-    in_playback: bool,
     reset_episode_fn,
     step_agent_fn,
     run_batch_training_fn,
 ) -> None:
-    """Render training controls (buttons, metrics, help, playback).
+    """Render training controls (buttons, metrics).
 
     Args:
         config: Configuration dict with 'tab_id' key
         display_state: Display state dict with 'ready_for_episode', 'is_terminal', 'total_episodes'
-        in_playback: Whether currently in playback mode
         reset_episode_fn: Function to reset episode (takes config)
         step_agent_fn: Function to step agent (takes config)
         run_batch_training_fn: Function to run batch training (takes episodes, config)
@@ -133,7 +130,6 @@ def render_training_controls(
         if st.button(
             "Train a new episode step by step",
             key=f"{tab_id}_new_episode",
-            disabled=in_playback,
         ):
             # Stop autoplay when starting a new episode
             autoplay_key = f"{tab_id}_autoplay_active"
@@ -150,7 +146,7 @@ def render_training_controls(
         with col1:
             # Not ready: show "Take Next Step" button
             if st.button(
-                "👟 Take Next Step", key=f"{tab_id}_step", disabled=in_playback
+                "👟 Take Next Step", key=f"{tab_id}_step"
             ):
                 # Stop autoplay if manually stepping
                 autoplay_key = f"{tab_id}_autoplay_active"
@@ -167,7 +163,6 @@ def render_training_controls(
             if st.button(
                 "⏩ Autoplay to complete this episode step by step",
                 key=f"{tab_id}_autoplay",
-                disabled=in_playback,
             ):
                 # Start autoplay
                 autoplay_last_step_key = f"{tab_id}_autoplay_last_step_time"
@@ -183,7 +178,7 @@ def render_training_controls(
                 st.session_state[autoplay_pending_rerun_key] = not ready_after_step
 
     # Fast forward section
-    if ready and not in_playback:
+    if ready:
         st.markdown("Or")
         n_episodes = st.number_input(
             "Speed up training by running this many episodes:",
@@ -202,40 +197,6 @@ def render_training_controls(
                 del st.session_state[autoplay_last_step_key]
             run_batch_training_fn(n_episodes, config)
             st.rerun()
-
-    st.markdown("---")
-
-    # Playback controls
-    inline_help(
-        "**Playback Controls**",
-        "Use these buttons to navigate through the training history. Each action refers to each time a button is clicked, which could be either a step in an episode or a batch training of episodes.",
-    )
-    playback_controls(config, in_playback)
-
-
-def playback_indicator(display_state: dict, in_playback: bool) -> None:
-    """
-    Check if the playback mode is active and display the appropriate indicator.
-    """
-    if in_playback:
-        action = display_state.get("action_type", "unknown")
-        meta = display_state.get("metadata", {})
-        if action == "batch":
-            episodes_trained = meta.get("episodes", 0)
-            total_episodes = display_state.get("total_episodes", 0)
-            if episodes_trained > 0 and total_episodes >= episodes_trained:
-                # Calculate episode range: start = total - episodes + 1, end = total
-                start_episode = total_episodes - episodes_trained + 1
-                end_episode = total_episodes
-                if start_episode == end_episode:
-                    desc = f"Batch Trained {meta.get('episodes', '0')} episodes (episode {start_episode})"
-                else:
-                    desc = f"Batch Trained {meta.get('episodes', '0')} episodes (episodes {start_episode}-{end_episode})"
-            else:
-                desc = f"Batch Trained ({episodes_trained} episodes)"
-        else:
-            desc = f"Episode {meta.get('episode', '0')}, Step {meta.get('step', '0')}"
-        st.warning(f"⏪ **Playback Mode** - {desc}")
 
 
 def render_training_controls_econ(

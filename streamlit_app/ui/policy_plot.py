@@ -44,7 +44,7 @@ def _create_policy_figure_1d(
     positions = list(range(start_pos, end_pos + 1))
     n_positions = len(positions)
 
-    fig, ax = plt.subplots(figsize=(max(6, n_positions * 0.8), 2))
+    fig, ax = plt.subplots(figsize=(max(8, n_positions * 1.0), 2.5))
 
     # Draw grid background (no borders)
     for i, pos in enumerate(positions):
@@ -126,7 +126,7 @@ def _create_policy_figure_2d(
     n_x = len(x_positions)
     n_y = len(y_positions)
 
-    fig, ax = plt.subplots(figsize=(max(4, n_x * 1.2), max(4, n_y * 1.2)))
+    fig, ax = plt.subplots(figsize=(max(6, n_x * 1.8), max(6, n_y * 1.8)))
 
     for x in x_positions:
         for y in y_positions:
@@ -250,7 +250,7 @@ def render_policy_1d(
         fig = _create_policy_figure_1d(q_table, start_pos, end_pos, goal_pos)
         # Convert figure to bytes and use st.image() to avoid media file storage issues
         buf = io.BytesIO()
-        fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
+        fig.savefig(buf, format="png", bbox_inches="tight", dpi=150)
         buf.seek(0)
         st.image(buf, width="stretch")
         buf.close()
@@ -260,7 +260,7 @@ def render_policy_1d(
         try:
             fig = _create_policy_figure_1d(q_table, start_pos, end_pos, goal_pos)
             buf = io.BytesIO()
-            fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
+            fig.savefig(buf, format="png", bbox_inches="tight", dpi=150)
             buf.seek(0)
             st.image(buf, width="stretch")
             buf.close()
@@ -299,7 +299,7 @@ def render_policy_2d(
         )
         # Convert figure to bytes and use st.image() to avoid media file storage issues
         buf = io.BytesIO()
-        fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
+        fig.savefig(buf, format="png", bbox_inches="tight", dpi=150)
         buf.seek(0)
         st.image(buf, width="stretch")
         buf.close()
@@ -311,7 +311,7 @@ def render_policy_2d(
                 q_table, x_start, x_end, y_start, y_end, goal_pos
             )
             buf = io.BytesIO()
-            fig.savefig(buf, format="png", bbox_inches="tight", dpi=100)
+            fig.savefig(buf, format="png", bbox_inches="tight", dpi=150)
             buf.seek(0)
             st.image(buf, width="stretch")
             buf.close()

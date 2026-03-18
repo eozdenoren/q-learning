@@ -26,6 +26,17 @@ __all__ = [
 ]
 
 
+# ---------- Price label formatting ----------
+
+def _price_fmt(prices: list) -> str:
+    """Return a format string with enough decimals to keep all price labels unique."""
+    for d in range(1, 5):
+        labels = [f"{p:.{d}f}" for p in prices]
+        if len(set(labels)) == len(labels):
+            return f".{d}f"
+    return ".3f"
+
+
 # ---------- Economics Helper Functions ----------
 
 
@@ -71,10 +82,9 @@ def calculate_prices(
     profit_c = (p_c - c) * demand1(p_c, p_c, k1, k2)
 
     # Feasible price interval: [2p_e - p_c, 2p_c - p_e]
+    # m equally spaced prices, following Calvano et al. (2020)
     price_start = 2 * p_e - p_c
     price_end = 2 * p_c - p_e
-
-    # Generate m equally spaced points and round to 1 decimal place to avoid floating point precision issues
     price = np.round(np.linspace(price_start, price_end, m), 3).tolist()
 
     return price, p_e, p_c, profit_e, profit_c
@@ -135,9 +145,12 @@ def argmax_tie(x: np.ndarray, rng: np.random.Generator) -> int:
 
 
 def greedy_map(Q: np.ndarray, rng: np.random.Generator) -> np.ndarray:
-    """Returns an array of length n_states with best-action indices."""
-    n_states = Q.shape[0]
-    return np.array([argmax_tie(Q[s_], rng) for s_ in range(n_states)], dtype=int)
+    """Returns an array of length n_states with best-action indices.
+
+    Uses np.argmax (deterministic) so convergence checks don't consume
+    the training RNG. All-zero rows always return action 0.
+    """
+    return np.argmax(Q, axis=1)
 
 
 # ---------- State Management Functions ----------
@@ -182,15 +195,16 @@ def init_session_state_econ(config: dict) -> None:
     rng = np.random.default_rng(seed)
     st.session_state[f"{tab_id}_rng"] = rng
 
-    # Initialize Q-tables (both start at zero)
+    # Initialize Q-tables to zero (standard)
     Q1 = np.zeros((n_states, n_actions))
     Q2 = np.zeros((n_states, n_actions))
     st.session_state[f"{tab_id}_Q1"] = Q1
     st.session_state[f"{tab_id}_Q2"] = Q2
 
     # Create Q-tables as DataFrames for display
-    states = [f"s({p1:.1f},{p2:.1f})" for p1 in prices for p2 in prices]
-    actions = [f"price={p:.1f}" for p in prices]
+    _fmt = _price_fmt(prices)
+    states = [f"s({p1:{_fmt}},{p2:{_fmt}})" for p1 in prices for p2 in prices]
+    actions = [f"price={p:{_fmt}}" for p in prices]
     st.session_state[f"{tab_id}_q_table_1"] = pd.DataFrame(
         Q1, index=states, columns=actions
     )
@@ -249,6 +263,10 @@ def init_session_state_econ(config: dict) -> None:
 
     # Convergence info
     st.session_state[f"{tab_id}_convergence_info"] = None
+
+    # Clear previous trajectory results
+    st.session_state[f"{tab_id}_trajectory"] = None
+    st.session_state[f"{tab_id}_trajectory_start"] = None
 
     # Logging
     st.session_state[f"{tab_id}_step_log"] = []  # Detailed step log
@@ -377,8 +395,9 @@ def step_agent_econ(config: dict) -> None:
     st.session_state[f"{tab_id}_Q2"] = Q2
 
     # Update DataFrame representations
-    states = [f"s({p1:.1f},{p2:.1f})" for p1 in prices for p2 in prices]
-    actions = [f"price={p:.1f}" for p in prices]
+    _fmt = _price_fmt(prices)
+    states = [f"s({p1:{_fmt}},{p2:{_fmt}})" for p1 in prices for p2 in prices]
+    actions = [f"price={p:{_fmt}}" for p in prices]
     st.session_state[f"{tab_id}_q_table_1"] = pd.DataFrame(
         Q1, index=states, columns=actions
     )
@@ -399,7 +418,7 @@ def step_agent_econ(config: dict) -> None:
     )
 
     step_entry_1 = {
-        "Player": "Alice (Q1)",
+        "Player": "AdrenaLine (Q1)",
         "Step": step_count,
         "State (s)": f"s({p1:.1f},{p2:.1f})",
         "Action (a1)": f"{p1_next:.1f}",
@@ -425,7 +444,7 @@ def step_agent_econ(config: dict) -> None:
     )
 
     step_entry_2 = {
-        "Player": "Bob (Q2)",
+        "Player": "BuzzFuel (Q2)",
         "Step": step_count,
         "State (s)": f"s({p1:.1f},{p2:.1f})",
         "Action (a1)": f"{p1_next:.1f}",
@@ -463,9 +482,8 @@ def step_agent_econ(config: dict) -> None:
         prev_pi1 = st.session_state[f"{tab_id}_prev_pi1"]
         prev_pi2 = st.session_state[f"{tab_id}_prev_pi2"]
 
-        if np.array_equal(current_pi1, prev_pi1) and np.array_equal(
-            current_pi2, prev_pi2
-        ):
+        if (np.array_equal(current_pi1, prev_pi1)
+                and np.array_equal(current_pi2, prev_pi2)):
             stable_count = st.session_state[f"{tab_id}_stable_count"] + check_every
             st.session_state[f"{tab_id}_stable_count"] = stable_count
 
@@ -570,9 +588,8 @@ def run_batch_training_econ(steps_to_run: int, config: dict) -> None:
             prev_pi1 = st.session_state[f"{tab_id}_prev_pi1"]
             prev_pi2 = st.session_state[f"{tab_id}_prev_pi2"]
 
-            if np.array_equal(current_pi1, prev_pi1) and np.array_equal(
-                current_pi2, prev_pi2
-            ):
+            if (np.array_equal(current_pi1, prev_pi1)
+                    and np.array_equal(current_pi2, prev_pi2)):
                 stable_count = st.session_state[f"{tab_id}_stable_count"] + check_every
                 st.session_state[f"{tab_id}_stable_count"] = stable_count
 
@@ -600,8 +617,9 @@ def run_batch_training_econ(steps_to_run: int, config: dict) -> None:
     st.session_state[f"{tab_id}_step_count"] = step_count
 
     # Update DataFrame representations
-    states = [f"s({p1:.1f},{p2:.1f})" for p1 in prices for p2 in prices]
-    actions = [f"price={p:.1f}" for p in prices]
+    _fmt = _price_fmt(prices)
+    states = [f"s({p1:{_fmt}},{p2:{_fmt}})" for p1 in prices for p2 in prices]
+    actions = [f"price={p:{_fmt}}" for p in prices]
     st.session_state[f"{tab_id}_q_table_1"] = pd.DataFrame(
         Q1, index=states, columns=actions
     )
@@ -698,9 +716,8 @@ def run_until_convergence_econ(config: dict) -> None:
             prev_pi1 = st.session_state[f"{tab_id}_prev_pi1"]
             prev_pi2 = st.session_state[f"{tab_id}_prev_pi2"]
 
-            if np.array_equal(current_pi1, prev_pi1) and np.array_equal(
-                current_pi2, prev_pi2
-            ):
+            if (np.array_equal(current_pi1, prev_pi1)
+                    and np.array_equal(current_pi2, prev_pi2)):
                 stable_count = st.session_state[f"{tab_id}_stable_count"] + check_every
                 st.session_state[f"{tab_id}_stable_count"] = stable_count
 
@@ -737,8 +754,9 @@ def run_until_convergence_econ(config: dict) -> None:
     st.session_state[f"{tab_id}_step_count"] = step_count
 
     # Update DataFrame representations
-    states = [f"s({p1:.1f},{p2:.1f})" for p1 in prices for p2 in prices]
-    actions = [f"price={p:.1f}" for p in prices]
+    _fmt = _price_fmt(prices)
+    states = [f"s({p1:{_fmt}},{p2:{_fmt}})" for p1 in prices for p2 in prices]
+    actions = [f"price={p:{_fmt}}" for p in prices]
     st.session_state[f"{tab_id}_q_table_1"] = pd.DataFrame(
         Q1, index=states, columns=actions
     )

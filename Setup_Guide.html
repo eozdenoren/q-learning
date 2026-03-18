@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Algorithmic Pricing — Setup Guide</title>
+<style>
+  body { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.7; color: #333; }
+  h1 { color: #1a1a2e; border-bottom: 3px solid #e94560; padding-bottom: 10px; }
+  h2 { color: #1a1a2e; margin-top: 40px; }
+  code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 0.95em; }
+  .cmd { background: #1a1a2e; color: #e0e0e0; padding: 15px 20px; border-radius: 8px; overflow-x: auto; font-size: 0.95em; font-family: 'Consolas', 'Courier New', monospace; margin: 12px 0; }
+  .box-mac { background: #f0f7ff; border-left: 4px solid #007aff; padding: 18px 22px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+  .box-win { background: #f5f0ff; border-left: 4px solid #6c5ce7; padding: 18px 22px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+  .box-mac h3, .box-win h3 { margin-top: 0; }
+  .box-mac h3 { color: #007aff; }
+  .box-win h3 { color: #6c5ce7; }
+  .note { background: #fff3cd; border: 1px solid #ffc107; padding: 12px 18px; border-radius: 8px; margin: 15px 0; }
+  .note strong { color: #856404; }
+  .success { background: #d4edda; border: 1px solid #28a745; padding: 12px 18px; border-radius: 8px; margin: 15px 0; }
+  .big-number { display: inline-block; width: 36px; height: 36px; background: #e94560; color: white; border-radius: 50%; text-align: center; line-height: 36px; font-weight: bold; font-size: 1.1em; margin-right: 8px; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+  td, th { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+  th { background: #f4f4f4; }
+  .summary { background: #f8f9fa; border: 2px solid #e94560; border-radius: 12px; padding: 20px 25px; margin: 25px 0; }
+  .summary h3 { margin-top: 0; color: #e94560; }
+  ol.steps > li { margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Algorithmic Pricing — Setup Guide</h1>
+
+<div class="summary">
+<h3>Overview</h3>
+<p>You'll run a pricing simulation app on your own laptop. Two steps:</p>
+<ol class="steps">
+<li><strong>Install Python</strong> (skip if you already have it)</li>
+<li><strong>Download one file and run it</strong> — everything else is automatic</li>
+</ol>
+</div>
+
+<div class="note">
+<strong>Already have Python?</strong> Open Terminal (Mac) or Command Prompt (Windows) and type <code>python3 --version</code> (Mac) or <code>python --version</code> (Windows). If you see <code>Python 3.9</code> or higher, skip straight to <a href="#step2">Step 2</a>.
+</div>
+
+<h2><span class="big-number">1</span> Install Python</h2>
+
+<p>Go to <strong><a href="https://www.python.org/downloads/">python.org/downloads</a></strong> and download the latest version.</p>
+
+<div class="box-mac">
+<h3>Mac</h3>
+<p>Open the downloaded <code>.pkg</code> file and follow the installer. That's it.</p>
+</div>
+
+<div class="box-win">
+<h3>Windows</h3>
+<p>Run the downloaded <code>.exe</code> file. On the <strong>first screen</strong>, check the box at the bottom that says:</p>
+<p style="text-align:center; font-size: 1.1em;"><strong>&#9745; Add python.exe to PATH</strong></p>
+<p>Then click <strong>Install Now</strong>.</p>
+</div>
+
+<h2 id="step2"><span class="big-number">2</span> Download and Run</h2>
+
+<ol>
+<li><strong><a href="https://drive.google.com/uc?export=download&id=1VRbXESaJofLPPe1tQ3c-_ITk3nIaXqnI">Click here to download run_app.py</a></strong><br>
+Google Drive will show a warning: <em>"can't scan this file for viruses"</em> — this is normal for any Python file. Click <strong>"Download anyway"</strong>.<br>
+Save it to your <strong>Desktop</strong>.</li>
+<li>Open <strong>Terminal</strong> (Mac) or <strong>Command Prompt</strong> (Windows).</li>
+<li>Paste the command below and press Enter:</li>
+</ol>
+
+<div class="box-mac">
+<h3>Mac</h3>
+<div class="cmd">python3 ~/Desktop/run_app.py</div>
+</div>
+
+<div class="box-win">
+<h3>Windows</h3>
+<div class="cmd">python %USERPROFILE%\Desktop\run_app.py</div>
+</div>
+
+<p>The script will automatically:</p>
+<ol>
+<li>Install the required Python packages (first time only, ~1 minute)</li>
+<li>Extract the app files</li>
+<li>Open the app in your browser</li>
+</ol>
+
+<div class="success">
+<strong>A browser window will open automatically</strong> showing the Q-Learning Demo. Use the sidebar on the left to navigate between pages, including <strong>Algorithmic Pricing</strong>.
+</div>
+
+<h2>Running Again Later</h2>
+
+<p>Just run the same command again. It will skip the installation step and launch immediately.</p>
+
+<div class="box-mac">
+<h3>Mac</h3>
+<div class="cmd">python3 ~/Desktop/run_app.py</div>
+</div>
+
+<div class="box-win">
+<h3>Windows</h3>
+<div class="cmd">python %USERPROFILE%\Desktop\run_app.py</div>
+</div>
+
+<h2>Stopping the App</h2>
+
+<p>Go back to Terminal / Command Prompt and press <strong>Ctrl+C</strong>.</p>
+
+<h2>Troubleshooting</h2>
+
+<table>
+<tr><th>Problem</th><th>Solution</th></tr>
+<tr>
+  <td><code>python3: command not found</code> (Mac)</td>
+  <td>Reinstall Python from python.org. Make sure to use the <code>.pkg</code> installer.</td>
+</tr>
+<tr>
+  <td><code>'python' is not recognized</code> (Windows)</td>
+  <td>You didn't check "Add to PATH" during installation. Uninstall Python, reinstall, and check the PATH box.</td>
+</tr>
+<tr>
+  <td>Browser doesn't open</td>
+  <td>Open your browser and go to <code>http://localhost:8501</code></td>
+</tr>
+<tr>
+  <td>Training takes a long time</td>
+  <td>Normal — 20-60 seconds with default parameters. It runs on your laptop's CPU.</td>
+</tr>
+<tr>
+  <td><code>Permission denied</code> (Mac)</td>
+  <td>Try: <code>chmod +x ~/Desktop/run_app.py</code> then run again.</td>
+</tr>
+</table>
+
+<br>
+<p style="color: #999; text-align: center; font-size: 0.85em;">Economics of AI — London Business School</p>
+
+</body>
+</html>
