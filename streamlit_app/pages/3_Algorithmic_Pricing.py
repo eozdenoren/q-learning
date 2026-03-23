@@ -17,12 +17,14 @@ from streamlit_app.ui.trajectory import (
     render_trajectory_econ,
     render_experiment_log,
     follow_greedy_until_loop_econ,
+    save_experiment_direct,
 )
 from streamlit_app.state_econ import (
     init_session_state_econ,
     run_until_convergence_econ,
     get_display_state_econ,
     pick_random_starting_prices_econ,
+    run_single_experiment,
     profit1,
     profit2,
     demand1,
@@ -44,46 +46,59 @@ tab_1, tab_2, tab_3, tab_4 = st.tabs(["The Environment", "Q-Learning & Competiti
 with tab_1:
     st.markdown(
         r"""
-        ### The Setup: Two Firms, One Market
+        ### The Setup: Two Ice Cream Vans on a Beach
 
-        Imagine two firms — **AdrenaLine** and **BuzzFuel** — selling competing energy
-        drinks. Every period, each firm simultaneously picks a price. Their products
-        are **substitutes**: if AdrenaLine raises its price, some customers switch to BuzzFuel,
-        and vice versa.
+        Picture a long, sandy beach stretching 1 km from end to end. Sunbathers are
+        spread evenly along the shore. At each end sits an ice cream van:
+        **Scoopy Doo** at the left end (position 0) and **Cone Solo** at the right
+        end (position 1).
 
-        **Demand.** Each firm's quantity sold depends on both prices:
+        Every sunbather wants exactly one ice cream. But walking in the hot sand is
+        unpleasant — the cost of walking $x$ km is $t \times x$, where $t$ is the
+        **transport cost**. Each sunbather values an ice cream at $v$.
 
-        $$q_1 = k_1 - p_1 + k_2 \cdot p_2, \qquad q_2 = k_1 - p_2 + k_2 \cdot p_1$$
+        **Demand.** A sunbather at position $x$ buys from Scoopy Doo if the net
+        benefit is higher:
 
-        The parameter $k_1$ captures the base level of demand, while $k_2$ measures how
-        substitutable the products are. When $k_2$ is high, a price cut by one firm steals
-        more customers from the other.
+        $$v - p_1 - t \cdot x \;\geq\; v - p_2 - t \cdot (1 - x)$$
 
-        **Profit.** Each firm earns margin times volume:
+        Solving for the **indifferent consumer** at $\hat{x} = \tfrac{1}{2} + \tfrac{p_2 - p_1}{2t}$:
+
+        $$q_1 = \frac{1}{2} + \frac{p_2 - p_1}{2t}, \qquad q_2 = \frac{1}{2} + \frac{p_1 - p_2}{2t}$$
+
+        Notice: $q_1 + q_2 = 1$ always — the whole beach buys. The transport cost $t$
+        controls how **differentiated** the products are. When $t$ is high, sunbathers
+        strongly prefer their nearby van even if it charges more. When $t$ is low,
+        they easily switch for a better price.
+
+        **Profit.** Each firm earns margin times market share:
 
         $$\pi_1 = (p_1 - c) \times q_1, \qquad \pi_2 = (p_2 - c) \times q_2$$
 
-        where $c$ is the (common) marginal cost.
+        where $c$ is the (common) marginal cost of producing an ice cream.
 
         ---
 
         ### Two Benchmarks
 
-        **The competitive price** ($p_e$). If each firm optimises its own profit taking the
-        other's price as given — the classic Nash equilibrium — they both land on:
+        **The competitive (Nash) price** ($p_e$). Each firm maximises its own profit
+        taking the rival's price as given. The first-order condition gives:
 
-        $$p_e = \frac{k_1 + c}{2 - k_2}$$
+        $$p_e = c + t$$
 
-        This is the price a rational, self-interested firm would choose if it believed the
-        other firm is doing the same.
+        The markup equals the transport cost: firms can charge above cost because
+        nearby consumers prefer not to walk further. Nash profit per firm: $\pi_e = t/2$.
 
-        **The collusive price** ($p_c$). If the two firms could coordinate — legally or
-        otherwise — they would jointly maximise total profit, leading to a higher price:
+        **The collusive price** ($p_c$). If the firms coordinate, they raise prices
+        until consumers are just willing to buy. The binding constraint is that the
+        most distant consumer (at the midpoint) must still want ice cream:
+        $v - p - t/2 \geq 0$. This gives:
 
-        $$p_c = \frac{2k_1 + 2c(1 - k_2)}{4(1 - k_2)}$$
+        $$p_c = v - \frac{t}{2}$$
 
-        Notice that $p_c > p_e$: coordination raises prices above the competitive level.
-        Both firms earn more, but consumers pay more. This is why cartels are illegal.
+        Collusion profit per firm: $\pi_c = (v - t/2 - c)/2$. The gap
+        $v - c - 3t/2$ measures the **room for collusion** — how much more firms
+        can extract by coordinating versus competing.
 
         """
     )
@@ -100,9 +115,14 @@ with tab_1:
             **State space.** The state is last period's price pair $(p_1, p_2)$. With $m$
             prices per firm, there are $m^2$ possible states.
 
-            **Example.** With $c = 3$, $k_1 = 9$, $k_2 = 0.67$: the competitive price is
-            $p_e \approx 9.0$, the collusive price is $p_c \approx 15.1$, and with $m = 15$
+            **Example.** With $c = 1$, $t = 1$, $v = 3$: the Nash price is
+            $p_e = 2.0$, the collusive price is $p_c = 2.5$, and with $m = 15$
             there are $225$ states.
+
+            **Why Hotelling?** This demand model has two key properties:
+            - **Bounded demand**: total quantity is always 1, so profits cannot blow up.
+            - **No super-collusion**: symmetric pricing is always optimal — asymmetric
+              alternating strategies that plagued the linear demand model cannot arise.
             """
         )
 
@@ -119,12 +139,12 @@ with tab_2:
         1. Last period's prices — both its own and the competitor's: $(p_1, p_2)$. This is the **state**.
         2. Its own profit $\pi_i$ from that period. This is the **reward**.
 
-        That's it. AdrenaLine does not know BuzzFuel's cost, Q-table, or strategy.
-        BuzzFuel does not know AdrenaLine's. Each firm is learning in the dark, just like
+        That's it. Scoopy Doo does not know Cone Solo's cost, Q-table, or strategy.
+        Cone Solo does not know Scoopy Doo's. Each firm is learning in the dark, just like
         Luna had no idea where the bone was.
 
         **What does each firm choose?** Its own price for the next period. This is the **action**.
-        AdrenaLine picks from the price grid $A = \{p^1, p^2, \ldots, p^m\}$, and so does BuzzFuel.
+        Scoopy Doo picks from the price grid $A = \{p^1, p^2, \ldots, p^m\}$, and so does Cone Solo.
 
         **How does it learn?** Exactly the same Bellman update:
 
@@ -230,23 +250,41 @@ with tab_2:
           emerge from Q-learning? And why can't the algorithms sustain *full* collusion
           — what would be needed to push prices all the way to $p_c$?
 
-        **Exercise 4: How substitutable are the products?**
-        The parameter $k_2$ controls how easily customers switch firms. Higher $k_2$
-        means more substitutable products and a larger collusion premium.
-        - Train with $k_2 = 0.67$ (default, ~34% collusion premium). Note $\Delta$.
-        - Try $k_2 = 0.3$ (very differentiated — small collusion premium).
+        **Exercise 4: How differentiated are the products?**
+        The parameter $t$ controls product differentiation (transport cost). Think
+        of $t$ as brand loyalty or switching cost: high $t$ is like iPhone vs Android
+        (ecosystem lock-in); low $t$ is like two petrol stations selling identical fuel.
+        - Train with $t = 1.0$ (default). Note $\Delta$.
+        - Try $t = 0.3$ (nearly identical — fierce competition, low Nash markup).
           What happens to $\Delta$? Is it stable across runs, or noisy?
-        - Try $k_2 = 0.5$. Does collusion look more consistent?
-        - Try $k_2 = 0.85$ (nearly identical — large premium). Do the
-          algorithms still find symmetric fixed points, or do you observe
-          longer cycles with asymmetric prices?
-        - *(Intuition: when products are nearly identical, a price cut steals
-          a lot of demand. The algorithms may discover "alternating" strategies
-          where firms take turns undercutting. When products are very differentiated,
-          the collusion premium is too small for the algorithms to reliably find.
-          The sweet spot for stable collusion is in the middle.)*
+        - Try $t = 0.5$. Does collusion look more consistent?
+        - **Caution:** when $t$ is small, the price grid becomes *coarser* (the range
+          $[2p_e - p_c,\; 2p_c - p_e]$ widens but $m$ stays at 15). From Exercise C below,
+          we know coarser grids inflate $\Delta$. So part of any increase in $\Delta$ at low $t$
+          is a grid artefact, not a real economic effect. To test this, try increasing $m$
+          to 35 when $t = 0.5$ and see if $\Delta$ falls.
+        - *(Intuition: when products are nearly identical ($t$ small), a price
+          cut steals a lot of demand — but the Nash markup is also tiny, so
+          there's relatively more to gain from collusion. When products are
+          very different ($t$ large), each firm already earns a large competitive
+          markup, and the additional gain from collusion is relatively smaller.)*
 
-        **Exercise 5: The big picture**
+        **Exercise 5: How essential is the product?**
+        The parameter $v$ controls how much consumers value the product — the maximum
+        they would pay. Think of high $v$ as medicine or heating fuel (consumers will
+        pay almost anything); low $v$ as fancy coffee (if the price is too high,
+        consumers walk away).
+        - Train with $v = 3.0$ (default). Note $\Delta$.
+        - Try $v = 2.6$ (just above the threshold $c + 3t/2 = 2.5$). What happens?
+          Is there any collusion?
+        - Try $v = 5.0$ (consumers really want the product). How does $\Delta$ change?
+        - Try $v = 10.0$. Does $\Delta$ keep rising?
+        - *(Intuition: higher $v$ widens the gap between Nash and collusive profits,
+          giving algorithms more room to extract supra-competitive prices. This is
+          exactly why regulators worry about algorithmic pricing in essential goods
+          markets — pharmaceuticals, energy, food.)*
+
+        **Exercise 6: The big picture**
         No one programmed these firms to collude. They never communicated. Each one
         simply maximised its own discounted profit by trial and error.
         - Under what conditions (parameters) do you observe both $\Delta$ values clearly
@@ -272,13 +310,26 @@ with tab_2:
           deal in alternating periods?
 
         **Exercise B: Exploration speed ($\beta$) and learning rate ($\alpha$)**
+        Think of $\alpha$ as how *reactive* the algorithm is: a high-$\alpha$ algorithm
+        aggressively adjusts to the rival's latest move (like an airline repricing
+        every minute), while a low-$\alpha$ algorithm changes prices gradually (like
+        a supermarket with weekly price reviews).
         - Try a high $\beta$ (fast decay — firms stop exploring early). What happens?
         - Try a very low $\beta$ (slow decay — prolonged exploration). Does $\Delta$ change?
-        - Now vary $\alpha$. Does a high learning rate help or hurt?
+        - Now vary $\alpha$. Does a high learning rate help or hurt collusion?
+          *(A fast learner quickly discovers that undercutting triggers retaliation.)*
 
         **Exercise C: Does the number of prices matter?**
-        - Compare $m = 4$ (coarse grid, $4^2 = 16$ states) with $m = 15$ (fine grid,
+        Think of $m$ as the *pricing precision* of the algorithm. A petrol station
+        that changes prices in 5-cent increments has a coarse grid; an airline
+        pricing to the penny has a fine grid.
+        - Compare $m = 7$ (coarse grid, $7^2 = 49$ states) with $m = 15$ (fine grid,
           $15^2 = 225$ states). Does a finer grid change the outcome?
+        - Try $m = 21$. Does collusion weaken further?
+        - *(Intuition: with fewer prices, the smallest possible undercut is a big
+          price drop, so the gain from cheating is small relative to the punishment.
+          More prices give the algorithm more ``escape routes'' to gradually shade
+          prices down.)*
         """
     )
 
@@ -294,12 +345,12 @@ with tab_3:
         # Set all widget keys to their default values
         st.session_state["training_alpha"] = 0.15
         st.session_state["training_delta"] = 0.95
-        st.session_state["training_k2"] = 0.67
+        st.session_state["training_t"] = 1.0
         st.session_state["training_m"] = 15
         st.session_state["training_beta_mantissa"] = 4.0
         st.session_state["training_beta_exponent"] = -6
-        st.session_state["training_k1"] = 9.0
-        st.session_state["training_c"] = 3.0
+        st.session_state["training_v"] = 3.0
+        st.session_state["training_c"] = 1.0
         st.session_state["training_check_every"] = 1000
         st.session_state["training_stable_required"] = 100000
         st.session_state["training_max_periods"] = 5000000
@@ -314,8 +365,8 @@ with tab_3:
         init_session_state_econ(config_demo)
         pick_random_starting_prices_econ(config_demo)
 
-    # Buttons: Reset, Train, Restore Defaults
-    col_reset, col_train, col_defaults, col_spacer = st.columns([1, 1, 1, 2])
+    # Buttons: Reset, Train, Multi-run, Restore Defaults
+    col_reset, col_train, col_multi_n, col_multi_run, col_defaults = st.columns([1.2, 1.2, 0.8, 1.2, 1.2])
     with col_reset:
         if st.button(
             "Reset / Initialize",
@@ -346,6 +397,22 @@ with tab_3:
                 pick_random_starting_prices_econ(config_demo)
             run_until_convergence_econ(config_demo)
             st.rerun()
+    with col_multi_n:
+        n_runs = st.number_input(
+            "# runs",
+            min_value=1,
+            max_value=50,
+            value=5,
+            step=1,
+            key="multi_n_runs",
+        )
+    with col_multi_run:
+        run_multi = st.button(
+            f"Train {n_runs} Seeds",
+            type="primary",
+            key="multi_run_btn",
+            help="Train the model with multiple random seeds using the current parameters. Each run is saved to the experiment log.",
+        )
     with col_defaults:
         if st.button(
             "Restore Defaults",
@@ -355,6 +422,43 @@ with tab_3:
         ):
             st.session_state["_restore_defaults"] = True
             st.rerun()
+
+    if run_multi:
+        import os
+        tab_id = config_demo.get("tab_id", "training")
+        cfg_alpha = st.session_state.get(f"{tab_id}_cfg_alpha", 0.15)
+        cfg_gamma = st.session_state.get(f"{tab_id}_cfg_delta", 0.95)
+        cfg_beta = st.session_state.get(f"{tab_id}_cfg_beta", 4e-6)
+        cfg_t = st.session_state.get(f"{tab_id}_cfg_t", 1.0)
+        cfg_v = st.session_state.get(f"{tab_id}_cfg_v", 3.0)
+        cfg_c = st.session_state.get(f"{tab_id}_cfg_c", 1.0)
+        cfg_m = st.session_state.get(f"{tab_id}_cfg_m", 15)
+
+        progress = st.progress(0, text="Starting...")
+        for i in range(n_runs):
+            seed = int.from_bytes(os.urandom(3), "big") % 1000000
+            progress.progress(
+                (i) / n_runs,
+                text=f"Run {i + 1}/{n_runs} (seed {seed})..."
+            )
+            result = run_single_experiment(
+                c=cfg_c, t=cfg_t, v=cfg_v, m=cfg_m,
+                alpha=cfg_alpha, gamma=cfg_gamma, beta=cfg_beta,
+                seed=seed,
+            )
+            save_experiment_direct(
+                alpha=cfg_alpha, gamma=cfg_gamma, beta=cfg_beta,
+                t=cfg_t, v=cfg_v, c=cfg_c, m=cfg_m, seed=seed,
+                steps=result["steps"],
+                p_e=result["p_e"], p_c=result["p_c"],
+                start_p1=result["start_p1"], start_p2=result["start_p2"],
+                cycle_len=result["cycle_len"], cycle_str=result["cycle_str"],
+                avg_p1=result["avg_p1"], avg_p2=result["avg_p2"],
+                avg_pi1=result["avg_pi1"], avg_pi2=result["avg_pi2"],
+                delta1=result["delta1"], delta2=result["delta2"],
+            )
+        progress.progress(1.0, text="Done!")
+        st.rerun()
 
     # Show convergence info
     display_state = get_display_state_econ(config_demo)
@@ -375,14 +479,14 @@ with tab_3:
                 f"Final exploration rate: {convergence_info['epsilon_final']:.2e}"
             )
     elif step_count == 0:
-        st.info("Click **Train Until Convergence** to start training.")
+        st.info("Click **Train the Model** to start training.")
 
     st.markdown("---")
 
     # --- B. Q-MATRICES ---
     col_q1, col_q2 = st.columns(2)
     with col_q1:
-        with st.expander(r"Q-Matrix: AdrenaLine ($Q_1$)", expanded=False):
+        with st.expander(r"Q-Matrix: Scoopy Doo ($Q_1$)", expanded=False):
             st.dataframe(
                 display_state["q_table_1"].style.highlight_max(
                     axis=1, color="lightgreen"
@@ -392,7 +496,7 @@ with tab_3:
             )
 
     with col_q2:
-        with st.expander(r"Q-Matrix: BuzzFuel ($Q_2$)", expanded=False):
+        with st.expander(r"Q-Matrix: Cone Solo ($Q_2$)", expanded=False):
             st.dataframe(
                 display_state["q_table_2"].style.highlight_max(
                     axis=1, color="lightgreen"
@@ -408,6 +512,7 @@ with tab_3:
 
     # --- D. EXPERIMENT LOG ---
     render_experiment_log()
+
 
 
 with tab_4:
@@ -429,7 +534,7 @@ with tab_4:
     with col_q1:
         # upload 1st Q-table
         player_1_name = st.text_input(
-            "Enter your name", value="AdrenaLine", key="player_1_name"
+            "Enter your name", value="Scoopy Doo", key="player_1_name"
         )
         uploaded_file1 = st.file_uploader(
             "Upload your 1st Q-tables csv file", type="csv", key="q_table_upload_1"
@@ -449,7 +554,7 @@ with tab_4:
     with col_q2:
         # upload 2nd Q-table
         player_2_name = st.text_input(
-            "Enter your name", value="BuzzFuel", key="player_2_name"
+            "Enter your name", value="Cone Solo", key="player_2_name"
         )
         uploaded_file2 = st.file_uploader(
             "Upload your 2nd Q-tables csv file", type="csv", key="q_table_upload_2"
@@ -474,33 +579,33 @@ with tab_4:
         "⚠️ These parameters must match the ones used to train the uploaded Q-tables."
     )
 
-    col_k1, col_k2, col_c = st.columns(3)
-    with col_k1:
-        battle_k1 = st.number_input(
-            r"$k_1$",
+    col_t, col_v, col_c = st.columns(3)
+    with col_t:
+        battle_t = st.number_input(
+            r"$t$ (Transport Cost)",
+            min_value=0.1,
+            max_value=10.0,
+            value=1.0,
+            step=0.1,
+            key="battle_t",
+            help="Transport cost / degree of product differentiation",
+        )
+    with col_v:
+        battle_v = st.number_input(
+            r"$v$ (Reservation Value)",
             min_value=0.1,
             max_value=20.0,
-            value=9.0,
+            value=3.0,
             step=0.1,
-            key="battle_k1",
-            help="Parameter in demand functions: q1 = k1 - p1 + k2 * p2",
-        )
-    with col_k2:
-        battle_k2 = st.number_input(
-            r"$k_2$",
-            min_value=0.0,
-            max_value=1.0,
-            value=0.67,
-            step=0.01,
-            key="battle_k2",
-            help="Cross-price parameter in demand functions",
+            key="battle_v",
+            help="Maximum willingness to pay",
         )
     with col_c:
         battle_c = st.number_input(
             r"$c$ (Marginal Cost)",
             min_value=0.0,
             max_value=10.0,
-            value=3.0,
+            value=1.0,
             step=0.1,
             key="battle_c",
             help="Marginal cost for both players",
@@ -516,7 +621,7 @@ with tab_4:
             "Starting price for Player 1",
             min_value=0.1,
             max_value=50.0,
-            value=9.0,
+            value=2.0,
             step=0.1,
             key="battle_start_p1",
         )
@@ -525,7 +630,7 @@ with tab_4:
             "Starting price for Player 2",
             min_value=0.1,
             max_value=50.0,
-            value=9.0,
+            value=2.0,
             step=0.1,
             key="battle_start_p2",
         )
@@ -616,17 +721,9 @@ with tab_4:
             n_actions = len(prices)
             n_states = n_actions * n_actions
 
-            # Calculate equilibrium and collusion prices and profits
-            # p_e = (k1 + c) / (2 - k2)
-            p_e = (battle_k1 + battle_c) / (2 - battle_k2)
-            # profit_e = (p_e - c) * demand1(p_e, p_e, k1, k2)
-            profit_e = (p_e - battle_c) * demand1(p_e, p_e, battle_k1, battle_k2)
-            # p_c = (2*k1 + 2*c*(1-k2)) / (4*(1-k2))
-            p_c = (2 * battle_k1 + 2 * battle_c * (1 - battle_k2)) / (
-                4 * (1 - battle_k2)
-            )
-            # profit_c = (p_c - c) * demand1(p_c, p_c, k1, k2)
-            profit_c = (p_c - battle_c) * demand1(p_c, p_c, battle_k1, battle_k2)
+            # Calculate equilibrium and collusion prices and profits (Hotelling)
+            from streamlit_app.state_econ import calculate_prices as _calc_prices
+            _, p_e, p_c, profit_e, profit_c = _calc_prices(battle_t, battle_v, battle_c, 15)
 
             if df1.shape != (n_states, n_actions) or df2.shape != (n_states, n_actions):
                 st.error(
@@ -680,8 +777,8 @@ with tab_4:
             # Store in session state for potential display (use different keys to avoid widget conflicts)
             st.session_state["battle_trajectory"] = traj
             st.session_state["battle_prices"] = prices
-            st.session_state["battle_cfg_k1"] = battle_k1
-            st.session_state["battle_cfg_k2"] = battle_k2
+            st.session_state["battle_cfg_t"] = battle_t
+            st.session_state["battle_cfg_v"] = battle_v
             st.session_state["battle_cfg_c"] = battle_c
             st.session_state["battle_cfg_start"] = (battle_start_p1, battle_start_p2)
             st.session_state["battle_cfg_p_e"] = p_e
@@ -700,9 +797,9 @@ with tab_4:
         traj = st.session_state["battle_trajectory"]
         prices = st.session_state["battle_prices"]
         # Read stored config values (stored when trajectory was computed)
-        battle_k1 = st.session_state.get("battle_cfg_k1", 7.0)
-        battle_k2 = st.session_state.get("battle_cfg_k2", 0.5)
-        battle_c = st.session_state.get("battle_cfg_c", 2.0)
+        battle_t = st.session_state.get("battle_cfg_t", 1.0)
+        battle_v = st.session_state.get("battle_cfg_v", 3.0)
+        battle_c = st.session_state.get("battle_cfg_c", 1.0)
         battle_start = st.session_state.get("battle_cfg_start", (7.0, 7.0))
         battle_start_p1, battle_start_p2 = battle_start
         p_e = st.session_state.get("battle_cfg_p_e", 0.0)
@@ -738,8 +835,8 @@ with tab_4:
                 p2 = rec["a2_price"]
                 loop_prices_alice.append(p1)
                 loop_prices_bob.append(p2)
-                pi1 = profit1(p1, p2, battle_c, battle_k1, battle_k2)
-                pi2 = profit2(p1, p2, battle_c, battle_k1, battle_k2)
+                pi1 = profit1(p1, p2, battle_c, battle_t, battle_v)
+                pi2 = profit2(p1, p2, battle_c, battle_t, battle_v)
                 loop_profits_alice.append(pi1)
                 loop_profits_bob.append(pi2)
 
@@ -874,7 +971,7 @@ with tab_4:
                         }
                     )
 
-                # Build table data: rows are AdrenaLine, BuzzFuel, Step; columns are trajectory steps
+                # Build table data: rows are Scoopy Doo, Cone Solo, Step; columns are trajectory steps
                 alice_row = []
                 bob_row = []
                 step_row = []
@@ -930,8 +1027,8 @@ with tab_4:
                 for rec in full_path:
                     p1 = rec["a1_price"]
                     p2 = rec["a2_price"]
-                    pi1 = profit1(p1, p2, battle_c, battle_k1, battle_k2)
-                    pi2 = profit2(p1, p2, battle_c, battle_k1, battle_k2)
+                    pi1 = profit1(p1, p2, battle_c, battle_t, battle_v)
+                    pi2 = profit2(p1, p2, battle_c, battle_t, battle_v)
                     alice_profit_row.append(f"{pi1:.2f}")
                     bob_profit_row.append(f"{pi2:.2f}")
                     step_row_profit.append(f"Step {rec['step_num']}")

@@ -331,12 +331,12 @@ def parameters_econ(tab_id: str) -> dict:
     DEFAULTS = {
         f"{tab_id}_alpha": 0.15,
         f"{tab_id}_delta": 0.95,
-        f"{tab_id}_k2": 0.67,
+        f"{tab_id}_t": 1.0,
         f"{tab_id}_m": 15,
         f"{tab_id}_beta_mantissa": 4.0,
         f"{tab_id}_beta_exponent": -6,
-        f"{tab_id}_k1": 9.0,
-        f"{tab_id}_c": 3.0,
+        f"{tab_id}_v": 3.0,
+        f"{tab_id}_c": 1.0,
     }
     # Seed session state with defaults for any key not yet set
     for k, v in DEFAULTS.items():
@@ -345,7 +345,7 @@ def parameters_econ(tab_id: str) -> dict:
 
     # Row 1: Model Parameters (primary controls students interact with)
     with st.expander("Model Parameters", expanded=True):
-        col_a, col_d, col_k2, col_m = st.columns(4)
+        col_a, col_d, col_t, col_m = st.columns(4)
 
         with col_a:
             alpha: float = st.slider(
@@ -363,14 +363,23 @@ def parameters_econ(tab_id: str) -> dict:
                 step=0.01,
                 key=f"{tab_id}_delta",
             )
-        with col_k2:
-            k2: float = st.slider(
-                r"$k_2$ (Substitutability)",
-                0.01,
-                0.99,
-                step=0.01,
-                key=f"{tab_id}_k2",
-                help="How easily customers switch firms. Higher = more substitutable. Sole determinant of the collusion premium: π_c/π_e = (2−k₂)²/[4(1−k₂)].",
+        with col_t:
+            # Dynamic t range: collusion requires t < 2(v-c)/3
+            _v_cur = st.session_state.get(f"{tab_id}_v", 3.0)
+            _c_cur = st.session_state.get(f"{tab_id}_c", 1.0)
+            _t_max = round(2.0 * (_v_cur - _c_cur) / 3.0, 1)
+            _t_max = max(0.4, _t_max)  # floor so slider is always usable
+            # Clamp current value if it exceeds new max
+            _t_cur = st.session_state.get(f"{tab_id}_t", 1.0)
+            if _t_cur > _t_max:
+                st.session_state[f"{tab_id}_t"] = _t_max
+            t: float = st.slider(
+                r"$t$ (Transport Cost)",
+                0.3,
+                _t_max,
+                step=0.1,
+                key=f"{tab_id}_t",
+                help=f"Degree of product differentiation. High t = weak competition. Low t = fierce competition. Max t = 2(v−c)/3 = {_t_max:.1f}.",
             )
         with col_m:
             m: int = int(st.radio(
@@ -405,17 +414,17 @@ def parameters_econ(tab_id: str) -> dict:
         beta: float = beta_mantissa * (10.0 ** beta_exponent)
 
     # Market parameters (fixed defaults, collapsed)
-    with st.expander("Market Parameters ($k_1$, $c$)", expanded=False):
-        col_k1, col_c = st.columns(2)
+    with st.expander("Market Parameters ($v$, $c$)", expanded=False):
+        col_v, col_c = st.columns(2)
 
-        with col_k1:
-            k1: float = st.number_input(
-                r"$k_1$ (Base Demand)",
+        with col_v:
+            v: float = st.number_input(
+                r"$v$ (Reservation Value)",
                 min_value=0.1,
                 max_value=20.0,
                 step=0.1,
-                key=f"{tab_id}_k1",
-                help="Base level of demand: q1 = k1 - p1 + k2 · p2. Only affects the scale of profits, not the relative gain from collusion.",
+                key=f"{tab_id}_v",
+                help="Maximum willingness to pay. Controls the collusion ceiling: p_c = v − t/2. Must satisfy v > c + 3t/2 for collusion to be profitable.",
             )
         with col_c:
             c: float = st.number_input(
@@ -424,30 +433,38 @@ def parameters_econ(tab_id: str) -> dict:
                 max_value=10.0,
                 step=0.1,
                 key=f"{tab_id}_c",
-                help="Marginal cost for both firms. Only affects the scale of profits, not the relative gain from collusion.",
+                help="Marginal cost for both firms.",
             )
 
     # Calculate and display benchmarks (always visible)
     prices = None
     start_mode = "Randomised"
-    fixed_start_p1 = 9.0
-    fixed_start_p2 = 9.0
+    fixed_start_p1 = 2.0
+    fixed_start_p2 = 2.0
+
+    # Validate: collusion must be more profitable than Nash
+    if v <= c + 1.5 * t:
+        st.warning(
+            f"$v$ must be greater than $c + 3t/2 = {c + 1.5*t:.1f}$ for collusion "
+            f"to be profitable. Increase $v$ or decrease $t$."
+        )
+
     try:
-        prices, p_e, p_c, profit_e, profit_c = calculate_prices(k1, k2, c, m)
+        prices, p_e, p_c, profit_e, profit_c = calculate_prices(t, v, c, m)
 
         # Format action space for display
         prices_display = [f"{p:.1f}" for p in prices]
         st.info(
-            f"**Equilibrium** $p_e = {p_e:.1f}$, $\\pi_e = {profit_e:.1f}$ | "
-            f"**Collusion** $p_c = {p_c:.1f}$, $\\pi_c = {profit_c:.1f}$ | "
+            f"**Nash** $p_e = {p_e:.2f}$, $\\pi_e = {profit_e:.2f}$ | "
+            f"**Collusion** $p_c = {p_c:.2f}$, $\\pi_c = {profit_c:.2f}$ | "
             f"**Prices** $A$ = {{{', '.join(prices_display)}}}",
         )
 
     except Exception as e:
         st.error(f"Error calculating prices: {e}")
-        prices = [3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0]
-        p_e = 9.0
-        p_c = 15.0
+        prices = [1.5, 2.0, 2.5, 3.0]
+        p_e = 2.0
+        p_c = 2.5
 
     # Advanced parameters (collapsed by default)
     with st.expander("Advanced Parameters", expanded=False):
@@ -490,8 +507,8 @@ def parameters_econ(tab_id: str) -> dict:
 
     return {
         "tab_id": tab_id,
-        "k1": k1,
-        "k2": k2,
+        "t": t,
+        "v": v,
         "c": c,
         "m": m,
         "alpha": alpha,

@@ -45,7 +45,7 @@ def render_bellman_log_econ(history_log: list[dict]) -> None:
     """Display Bellman update equations and history table for economics pricing (dual Q-matrices).
 
     Args:
-        history_log: List of step log entries, alternating between Q1 (AdrenaLine) and Q2 (BuzzFuel) entries
+        history_log: List of step log entries, alternating between Q1 (Scoopy Doo) and Q2 (Cone Solo) entries
     """
     st.subheader("Bellman Update Log")
     st.latex(
@@ -57,15 +57,15 @@ def render_bellman_log_econ(history_log: list[dict]) -> None:
         return
 
     # Separate Q1 and Q2 logs
-    q1_logs = [log for log in history_log if log.get("Player") == "AdrenaLine (Q1)"]
-    q2_logs = [log for log in history_log if log.get("Player") == "BuzzFuel (Q2)"]
+    q1_logs = [log for log in history_log if log.get("Player") == "Scoopy Doo (Q1)"]
+    q2_logs = [log for log in history_log if log.get("Player") == "Cone Solo (Q2)"]
 
     # Get latest updates if available
     last_q1 = q1_logs[-1] if q1_logs else None
     last_q2 = q2_logs[-1] if q2_logs else None
 
     # Show history tables in tabs
-    tab1, tab2 = st.tabs([r"🅰️ AdrenaLine ($Q_1$)", r"🅱️ BuzzFuel ($Q_2$)"])
+    tab1, tab2 = st.tabs([r"🅰️ Scoopy Doo ($Q_1$)", r"🅱️ Cone Solo ($Q_2$)"])
 
     with tab1:
         if last_q1:

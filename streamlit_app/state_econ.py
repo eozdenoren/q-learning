@@ -23,6 +23,7 @@ __all__ = [
     "jump_to_latest_econ",
     "jump_to_start_econ",
     "flip_q_table_states",
+    "run_single_experiment",
 ]
 
 
@@ -40,51 +41,74 @@ def _price_fmt(prices: list) -> str:
 # ---------- Economics Helper Functions ----------
 
 
-def demand1(p1: float, p2: float, k1: float, k2: float) -> float:
-    """Demand function for player 1: q1 = k1 - p1 + k2 * p2."""
-    return max(0.0, k1 - p1 + k2 * p2)
+def demand1(p1: float, p2: float, t: float, v: float) -> float:
+    """Hotelling demand for firm 1 with uncovered market.
+
+    Accounts for consumers who choose not to buy if price is too high.
+    q1 = min(x_hat, (v - p1)/t) where x_hat = 1/2 + (p2 - p1)/(2t).
+    """
+    if p1 >= v:
+        return 0.0
+    x_hat = 0.5 + (p2 - p1) / (2 * t)
+    x_max = (v - p1) / t
+    return max(0.0, min(1.0, min(x_hat, x_max)))
 
 
-def demand2(p1: float, p2: float, k1: float, k2: float) -> float:
-    """Demand function for player 2: q2 = k1 - p2 + k2 * p1."""
-    return max(0.0, k1 - p2 + k2 * p1)
+def demand2(p1: float, p2: float, t: float, v: float) -> float:
+    """Hotelling demand for firm 2 with uncovered market.
+
+    q2 = min(1 - x_hat, (v - p2)/t) where x_hat = 1/2 + (p2 - p1)/(2t).
+    """
+    if p2 >= v:
+        return 0.0
+    x_hat = 0.5 + (p2 - p1) / (2 * t)
+    x_max = (v - p2) / t
+    return max(0.0, min(1.0, min(1.0 - x_hat, x_max)))
 
 
-def profit1(p1: float, p2: float, c: float, k1: float, k2: float) -> float:
-    """Profit function for player 1: π1 = (p1 - c) * q1."""
-    return (p1 - c) * demand1(p1, p2, k1, k2)
+def profit1(p1: float, p2: float, c: float, t: float, v: float) -> float:
+    """Profit for firm 1: π1 = (p1 - c) * q1."""
+    return (p1 - c) * demand1(p1, p2, t, v)
 
 
-def profit2(p1: float, p2: float, c: float, k1: float, k2: float) -> float:
-    """Profit function for player 2: π2 = (p2 - c) * q2."""
-    return (p2 - c) * demand2(p1, p2, k1, k2)
+def profit2(p1: float, p2: float, c: float, t: float, v: float) -> float:
+    """Profit for firm 2: π2 = (p2 - c) * q2."""
+    return (p2 - c) * demand2(p1, p2, t, v)
 
 
 def calculate_prices(
-    k1: float, k2: float, c: float, m: int
+    t: float, v: float, c: float, m: int
 ) -> tuple[list[float], float, float, float, float]:
-    """Calculate equilibrium price, collusion price, and action space.
+    """Calculate equilibrium price, collusion price, and action space (Hotelling model).
 
     Returns:
-        (prices list, p_e (equilibrium), p_c (collusion), profit_e (equilibrium profit), profit_c (collusion profit))
+        (prices list, p_e (Nash equilibrium), p_c (collusion), profit_e, profit_c)
     """
 
-    # Calculate equilibrium price: p_e = (k1 + c) / (2 - k2)
-    p_e = (k1 + c) / (2 - k2)
+    # Nash equilibrium price: p_e = c + t
+    p_e = c + t
 
-    # Calculate equilibrium profit: π_e = (p_e - c) * demand1(p_e, p_e, k1, k2)
-    profit_e = (p_e - c) * demand1(p_e, p_e, k1, k2)
+    # Nash equilibrium profit per firm: π_e = (p_e - c) * 1/2 = t/2
+    profit_e = t / 2.0
 
-    # Calculate collusion price: p_c = (2*k1 + 2*c*(1-k2)) / (4*(1-k2))
-    p_c = (2 * k1 + 2 * c * (1 - k2)) / (4 * (1 - k2))
+    # Collusion price: p_c = v - t/2  (constrained by consumer willingness to pay)
+    p_c = v - t / 2.0
 
-    # Calculate collusion profit: π_c = (p_c - c) * demand1(p_c, p_c, k1, k2)
-    profit_c = (p_c - c) * demand1(p_c, p_c, k1, k2)
+    # Collusion profit per firm: π_c = (p_c - c) * 1/2
+    profit_c = (p_c - c) / 2.0
 
     # Feasible price interval: [2p_e - p_c, 2p_c - p_e]
     # m equally spaced prices, following Calvano et al. (2020)
     price_start = 2 * p_e - p_c
     price_end = 2 * p_c - p_e
+
+    # Guard: ensure grid is valid (p_c > p_e) and non-negative
+    if price_start >= price_end:
+        price_start, price_end = price_end, price_start
+    price_start = max(0.0, price_start)
+    if price_end <= price_start:
+        price_end = price_start + 1.0
+
     price = np.round(np.linspace(price_start, price_end, m), 3).tolist()
 
     return price, p_e, p_c, profit_e, profit_c
@@ -153,14 +177,129 @@ def greedy_map(Q: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     return np.argmax(Q, axis=1)
 
 
+# ---------- Standalone Experiment (no session state) ----------
+
+
+def run_single_experiment(
+    c: float, t: float, v: float, m: int,
+    alpha: float, gamma: float, beta: float, seed: int,
+    check_every: int = 1000, stable_required: int = 100000,
+    max_periods: int = 2000000,
+) -> dict:
+    """Run a full Q-learning experiment without touching Streamlit session state.
+
+    Returns a dict with converged prices, Delta values, cycle info, etc.
+    """
+    prices, p_e, p_c, profit_e, profit_c = calculate_prices(t, v, c, m)
+    n = len(prices)
+    n_states = n * n
+
+    rng = np.random.default_rng(seed)
+    Q1 = np.zeros((n_states, n))
+    Q2 = np.zeros((n_states, n))
+
+    # Random starting state
+    a1_start = int(rng.integers(0, n))
+    a2_start = int(rng.integers(0, n))
+    s = a1_start * n + a2_start
+    start_p1, start_p2 = prices[a1_start], prices[a2_start]
+
+    prev_pi1 = np.argmax(Q1, axis=1)
+    prev_pi2 = np.argmax(Q2, axis=1)
+    stable = 0
+    step = 0
+
+    for step in range(1, max_periods + 1):
+        eps = np.exp(-beta * step)
+        a1 = int(rng.integers(0, n)) if rng.random() < eps else argmax_tie(Q1[s], rng)
+        a2 = int(rng.integers(0, n)) if rng.random() < eps else argmax_tie(Q2[s], rng)
+        p1n, p2n = prices[a1], prices[a2]
+        sn = state_index(p1n, p2n, prices)
+        pi1 = profit1(p1n, p2n, c, t, v)
+        pi2 = profit2(p1n, p2n, c, t, v)
+        Q1[s, a1] = (1 - alpha) * Q1[s, a1] + alpha * (pi1 + gamma * np.max(Q1[sn]))
+        Q2[s, a2] = (1 - alpha) * Q2[s, a2] + alpha * (pi2 + gamma * np.max(Q2[sn]))
+        s = sn
+        if step % check_every == 0:
+            cp1 = np.argmax(Q1, axis=1)
+            cp2 = np.argmax(Q2, axis=1)
+            if np.array_equal(cp1, prev_pi1) and np.array_equal(cp2, prev_pi2):
+                stable += check_every
+                if stable >= stable_required:
+                    break
+            else:
+                stable = 0
+                prev_pi1, prev_pi2 = cp1, cp2
+
+    converged = stable >= stable_required
+
+    # Follow greedy policy to find equilibrium cycle
+    s_eq = s
+    for _ in range(200):
+        a1 = int(np.argmax(Q1[s_eq]))
+        a2 = int(np.argmax(Q2[s_eq]))
+        s_eq = a1 * n + a2
+
+    # Detect cycle
+    visited = {}
+    path = []
+    for i in range(1000):
+        if s_eq in visited:
+            loop_start = visited[s_eq]
+            cycle = path[loop_start:]
+            break
+        visited[s_eq] = i
+        a1 = int(np.argmax(Q1[s_eq]))
+        a2 = int(np.argmax(Q2[s_eq]))
+        p1_act, p2_act = prices[a1], prices[a2]
+        path.append((p1_act, p2_act))
+        s_eq = a1 * n + a2
+    else:
+        cycle = [path[-1]] if path else [(prices[0], prices[0])]
+
+    # Compute average prices and profits over cycle
+    avg_p1 = np.mean([p[0] for p in cycle])
+    avg_p2 = np.mean([p[1] for p in cycle])
+    avg_pi1 = np.mean([profit1(p[0], p[1], c, t, v) for p in cycle])
+    avg_pi2 = np.mean([profit2(p[0], p[1], c, t, v) for p in cycle])
+
+    # Delta
+    denom = profit_c - profit_e
+    d1 = (avg_pi1 - profit_e) / denom if abs(denom) > 1e-10 else 0.0
+    d2 = (avg_pi2 - profit_e) / denom if abs(denom) > 1e-10 else 0.0
+
+    # Cycle string
+    cycle_str = " → ".join(f"({p[0]:.2f},{p[1]:.2f})" for p in cycle)
+
+    return {
+        "converged": converged,
+        "steps": step,
+        "seed": seed,
+        "start_p1": start_p1,
+        "start_p2": start_p2,
+        "cycle_len": len(cycle),
+        "cycle_str": cycle_str,
+        "avg_p1": avg_p1,
+        "avg_p2": avg_p2,
+        "avg_pi1": avg_pi1,
+        "avg_pi2": avg_pi2,
+        "delta1": d1,
+        "delta2": d2,
+        "p_e": p_e,
+        "p_c": p_c,
+        "profit_e": profit_e,
+        "profit_c": profit_c,
+    }
+
+
 # ---------- State Management Functions ----------
 
 
 def init_session_state_econ(config: dict) -> None:
     """Initialize or reset all session state for economics pricing (tab-scoped)."""
     tab_id = config.get("tab_id", "default")
-    k1 = config["k1"]
-    k2 = config["k2"]
+    t = config["t"]
+    v = config["v"]
     c = config["c"]
     m = config["m"]
     alpha = config["alpha"]
@@ -169,7 +308,7 @@ def init_session_state_econ(config: dict) -> None:
     seed = config.get("seed", 43)
 
     # Calculate prices and key prices
-    prices, p_e, p_c, profit_e, profit_c = calculate_prices(k1, k2, c, m)
+    prices, p_e, p_c, profit_e, profit_c = calculate_prices(t, v, c, m)
     n_actions = len(prices)
     n_states = n_actions * n_actions
 
@@ -178,8 +317,8 @@ def init_session_state_econ(config: dict) -> None:
     st.session_state[f"{tab_id}_n_actions"] = n_actions
     st.session_state[f"{tab_id}_n_states"] = n_states
     # Store config values under cfg_ keys to avoid widget key collisions
-    st.session_state[f"{tab_id}_cfg_k1"] = k1
-    st.session_state[f"{tab_id}_cfg_k2"] = k2
+    st.session_state[f"{tab_id}_cfg_t"] = t
+    st.session_state[f"{tab_id}_cfg_v"] = v
     st.session_state[f"{tab_id}_cfg_c"] = c
     st.session_state[f"{tab_id}_cfg_m"] = m
     st.session_state[f"{tab_id}_cfg_alpha"] = alpha
@@ -328,8 +467,8 @@ def step_agent_econ(config: dict) -> None:
     # Get configuration
     prices = st.session_state[f"{tab_id}_prices"]
     n_actions = st.session_state[f"{tab_id}_n_actions"]
-    k1 = st.session_state[f"{tab_id}_cfg_k1"]
-    k2 = st.session_state[f"{tab_id}_cfg_k2"]
+    t = st.session_state[f"{tab_id}_cfg_t"]
+    v = st.session_state[f"{tab_id}_cfg_v"]
     c = st.session_state[f"{tab_id}_cfg_c"]
     alpha = st.session_state[f"{tab_id}_cfg_alpha"]
     delta = st.session_state[f"{tab_id}_cfg_delta"]
@@ -372,10 +511,10 @@ def step_agent_econ(config: dict) -> None:
     s_next = state_index(p1_next, p2_next, prices)
 
     # Calculate demands and profits (rewards)
-    q1 = demand1(p1_next, p2_next, k1, k2)
-    q2 = demand2(p1_next, p2_next, k1, k2)
-    pi1 = profit1(p1_next, p2_next, c, k1, k2)
-    pi2 = profit2(p1_next, p2_next, c, k1, k2)
+    q1 = demand1(p1_next, p2_next, t, v)
+    q2 = demand2(p1_next, p2_next, t, v)
+    pi1 = profit1(p1_next, p2_next, c, t, v)
+    pi2 = profit2(p1_next, p2_next, c, t, v)
 
     # Q-learning updates
     old_val_1 = Q1[s, a1]
@@ -418,7 +557,7 @@ def step_agent_econ(config: dict) -> None:
     )
 
     step_entry_1 = {
-        "Player": "AdrenaLine (Q1)",
+        "Player": "Scoopy Doo (Q1)",
         "Step": step_count,
         "State (s)": f"s({p1:.1f},{p2:.1f})",
         "Action (a1)": f"{p1_next:.1f}",
@@ -444,7 +583,7 @@ def step_agent_econ(config: dict) -> None:
     )
 
     step_entry_2 = {
-        "Player": "BuzzFuel (Q2)",
+        "Player": "Cone Solo (Q2)",
         "Step": step_count,
         "State (s)": f"s({p1:.1f},{p2:.1f})",
         "Action (a1)": f"{p1_next:.1f}",
@@ -521,8 +660,8 @@ def run_batch_training_econ(steps_to_run: int, config: dict) -> None:
     # Get configuration
     prices = st.session_state[f"{tab_id}_prices"]
     n_actions = st.session_state[f"{tab_id}_n_actions"]
-    k1 = st.session_state[f"{tab_id}_cfg_k1"]
-    k2 = st.session_state[f"{tab_id}_cfg_k2"]
+    t = st.session_state[f"{tab_id}_cfg_t"]
+    v = st.session_state[f"{tab_id}_cfg_v"]
     c = st.session_state[f"{tab_id}_cfg_c"]
     alpha = st.session_state[f"{tab_id}_cfg_alpha"]
     delta = st.session_state[f"{tab_id}_cfg_delta"]
@@ -572,8 +711,8 @@ def run_batch_training_econ(steps_to_run: int, config: dict) -> None:
         s_next = state_index(p1_next, p2_next, prices)
 
         # Calculate profits
-        pi1 = profit1(p1_next, p2_next, c, k1, k2)
-        pi2 = profit2(p1_next, p2_next, c, k1, k2)
+        pi1 = profit1(p1_next, p2_next, c, t, v)
+        pi2 = profit2(p1_next, p2_next, c, t, v)
 
         # Q-learning updates
         Q1[s, a1] = (1 - alpha) * Q1[s, a1] + alpha * (pi1 + delta * np.max(Q1[s_next]))
@@ -653,8 +792,8 @@ def run_until_convergence_econ(config: dict) -> None:
     # Get configuration
     prices = st.session_state[f"{tab_id}_prices"]
     n_actions = st.session_state[f"{tab_id}_n_actions"]
-    k1 = st.session_state[f"{tab_id}_cfg_k1"]
-    k2 = st.session_state[f"{tab_id}_cfg_k2"]
+    t = st.session_state[f"{tab_id}_cfg_t"]
+    v = st.session_state[f"{tab_id}_cfg_v"]
     c = st.session_state[f"{tab_id}_cfg_c"]
     alpha = st.session_state[f"{tab_id}_cfg_alpha"]
     delta = st.session_state[f"{tab_id}_cfg_delta"]
@@ -700,8 +839,8 @@ def run_until_convergence_econ(config: dict) -> None:
         s_next = state_index(p1_next, p2_next, prices)
 
         # Calculate profits
-        pi1 = profit1(p1_next, p2_next, c, k1, k2)
-        pi2 = profit2(p1_next, p2_next, c, k1, k2)
+        pi1 = profit1(p1_next, p2_next, c, t, v)
+        pi2 = profit2(p1_next, p2_next, c, t, v)
 
         # Q-learning updates
         Q1[s, a1] = (1 - alpha) * Q1[s, a1] + alpha * (pi1 + delta * np.max(Q1[s_next]))
