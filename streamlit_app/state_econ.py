@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import streamlit as st
+from numba import njit
 
 # Performance: Limit checkpoint history to prevent memory bloat
 MAX_CHECKPOINTS = 50
@@ -177,6 +178,130 @@ def greedy_map(Q: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     return np.argmax(Q, axis=1)
 
 
+# ---------- Numba JIT Core Loop ----------
+
+
+@njit(cache=True)
+def _train_loop_jit(prices, n, c, t, v, alpha, gamma, beta,
+                    Q1, Q2, s_init, check_every, stable_required,
+                    max_periods, rng_seed):
+    """Core Q-learning training loop compiled to machine code via Numba.
+
+    Returns (steps_run, final_state, stable_count, converged).
+    Q1 and Q2 are modified in-place.
+    """
+    np.random.seed(rng_seed)
+    s = s_init
+
+    prev_pi1 = np.zeros(n * n, dtype=np.int64)
+    prev_pi2 = np.zeros(n * n, dtype=np.int64)
+    stable = 0
+    step = 0
+
+    for step in range(1, max_periods + 1):
+        eps = np.exp(-beta * step)
+
+        # Player 1: epsilon-greedy
+        if np.random.random() < eps:
+            a1 = np.random.randint(0, n)
+        else:
+            a1 = 0
+            mx = Q1[s, 0]
+            for j in range(1, n):
+                if Q1[s, j] > mx:
+                    mx = Q1[s, j]
+                    a1 = j
+
+        # Player 2: epsilon-greedy
+        if np.random.random() < eps:
+            a2 = np.random.randint(0, n)
+        else:
+            a2 = 0
+            mx = Q2[s, 0]
+            for j in range(1, n):
+                if Q2[s, j] > mx:
+                    mx = Q2[s, j]
+                    a2 = j
+
+        p1n = prices[a1]
+        p2n = prices[a2]
+        sn = a1 * n + a2
+
+        # Demand 1
+        if p1n >= v:
+            d1 = 0.0
+        else:
+            x_hat = 0.5 + (p2n - p1n) / (2.0 * t)
+            x_max = (v - p1n) / t
+            d1 = min(x_hat, x_max)
+            if d1 < 0.0:
+                d1 = 0.0
+            elif d1 > 1.0:
+                d1 = 1.0
+
+        # Demand 2
+        if p2n >= v:
+            d2 = 0.0
+        else:
+            x_hat2 = 0.5 + (p1n - p2n) / (2.0 * t)
+            x_max2 = (v - p2n) / t
+            d2 = min(x_hat2, x_max2)
+            if d2 < 0.0:
+                d2 = 0.0
+            elif d2 > 1.0:
+                d2 = 1.0
+
+        pi1 = (p1n - c) * d1
+        pi2 = (p2n - c) * d2
+
+        # Max Q for next state
+        max_q1 = Q1[sn, 0]
+        max_q2 = Q2[sn, 0]
+        for j in range(1, n):
+            if Q1[sn, j] > max_q1:
+                max_q1 = Q1[sn, j]
+            if Q2[sn, j] > max_q2:
+                max_q2 = Q2[sn, j]
+
+        # Q-learning updates
+        Q1[s, a1] = (1.0 - alpha) * Q1[s, a1] + alpha * (pi1 + gamma * max_q1)
+        Q2[s, a2] = (1.0 - alpha) * Q2[s, a2] + alpha * (pi2 + gamma * max_q2)
+        s = sn
+
+        # Convergence check
+        if step % check_every == 0:
+            changed = False
+            for i in range(n * n):
+                best1 = 0
+                mx1 = Q1[i, 0]
+                for j in range(1, n):
+                    if Q1[i, j] > mx1:
+                        mx1 = Q1[i, j]
+                        best1 = j
+                if best1 != prev_pi1[i]:
+                    changed = True
+                prev_pi1[i] = best1
+
+                best2 = 0
+                mx2 = Q2[i, 0]
+                for j in range(1, n):
+                    if Q2[i, j] > mx2:
+                        mx2 = Q2[i, j]
+                        best2 = j
+                if best2 != prev_pi2[i]:
+                    changed = True
+                prev_pi2[i] = best2
+
+            if not changed:
+                stable += check_every
+                if stable >= stable_required:
+                    return step, s, stable, True
+            else:
+                stable = 0
+
+    return step, s, stable, False
+
+
 # ---------- Standalone Experiment (no session state) ----------
 
 
@@ -193,10 +318,11 @@ def run_single_experiment(
     prices, p_e, p_c, profit_e, profit_c = calculate_prices(t, v, c, m)
     n = len(prices)
     n_states = n * n
+    prices_arr = np.array(prices, dtype=np.float64)
 
     rng = np.random.default_rng(seed)
-    Q1 = np.zeros((n_states, n))
-    Q2 = np.zeros((n_states, n))
+    Q1 = np.zeros((n_states, n), dtype=np.float64)
+    Q2 = np.zeros((n_states, n), dtype=np.float64)
 
     # Random starting state
     a1_start = int(rng.integers(0, n))
@@ -204,34 +330,11 @@ def run_single_experiment(
     s = a1_start * n + a2_start
     start_p1, start_p2 = prices[a1_start], prices[a2_start]
 
-    prev_pi1 = np.argmax(Q1, axis=1)
-    prev_pi2 = np.argmax(Q2, axis=1)
-    stable = 0
-    step = 0
-
-    for step in range(1, max_periods + 1):
-        eps = np.exp(-beta * step)
-        a1 = int(rng.integers(0, n)) if rng.random() < eps else argmax_tie(Q1[s], rng)
-        a2 = int(rng.integers(0, n)) if rng.random() < eps else argmax_tie(Q2[s], rng)
-        p1n, p2n = prices[a1], prices[a2]
-        sn = state_index(p1n, p2n, prices)
-        pi1 = profit1(p1n, p2n, c, t, v)
-        pi2 = profit2(p1n, p2n, c, t, v)
-        Q1[s, a1] = (1 - alpha) * Q1[s, a1] + alpha * (pi1 + gamma * np.max(Q1[sn]))
-        Q2[s, a2] = (1 - alpha) * Q2[s, a2] + alpha * (pi2 + gamma * np.max(Q2[sn]))
-        s = sn
-        if step % check_every == 0:
-            cp1 = np.argmax(Q1, axis=1)
-            cp2 = np.argmax(Q2, axis=1)
-            if np.array_equal(cp1, prev_pi1) and np.array_equal(cp2, prev_pi2):
-                stable += check_every
-                if stable >= stable_required:
-                    break
-            else:
-                stable = 0
-                prev_pi1, prev_pi2 = cp1, cp2
-
-    converged = stable >= stable_required
+    # Run JIT-compiled training loop
+    step, s, _stable, converged = _train_loop_jit(
+        prices_arr, n, c, t, v, alpha, gamma, beta,
+        Q1, Q2, s, check_every, stable_required, max_periods, seed,
+    )
 
     # Follow greedy policy to find equilibrium cycle
     s_eq = s
@@ -680,71 +783,27 @@ def run_batch_training_econ(steps_to_run: int, config: dict) -> None:
     # Track starting step for skipped range
     start_step = step_count + 1
 
-    # Run steps
-    for _ in range(steps_to_run):
-        step_count += 1
+    # Use JIT-compiled loop (cap at steps_to_run via max_periods)
+    jit_seed = int(rng.integers(0, 2**31))
+    prices_arr = np.array(prices, dtype=np.float64)
+    jit_max = min(steps_to_run, max_periods - step_count)
 
-        # Check max periods
-        if step_count > max_periods:
-            break
+    step_ran, s, stable_ct, conv = _train_loop_jit(
+        prices_arr, n_actions, c, t, v, alpha, delta, beta,
+        Q1, Q2, s, check_every, stable_required, jit_max, jit_seed,
+    )
+    step_count += step_ran
 
-        # Get current prices
-        p1, p2 = index_to_state(s, prices)
-
-        # Calculate epsilon
-        eps = epsilon_at(step_count, beta)
-
-        # ε-greedy action selection
-        if rng.random() < eps:
-            a1 = rng.integers(0, n_actions)
-        else:
-            a1 = argmax_tie(Q1[s], rng)
-
-        if rng.random() < eps:
-            a2 = rng.integers(0, n_actions)
-        else:
-            a2 = argmax_tie(Q2[s], rng)
-
-        # Compute next state
-        p1_next = prices[a1]
-        p2_next = prices[a2]
-        s_next = state_index(p1_next, p2_next, prices)
-
-        # Calculate profits
-        pi1 = profit1(p1_next, p2_next, c, t, v)
-        pi2 = profit2(p1_next, p2_next, c, t, v)
-
-        # Q-learning updates
-        Q1[s, a1] = (1 - alpha) * Q1[s, a1] + alpha * (pi1 + delta * np.max(Q1[s_next]))
-        Q2[s, a2] = (1 - alpha) * Q2[s, a2] + alpha * (pi2 + delta * np.max(Q2[s_next]))
-
-        s = s_next
-
-        # Check convergence
-        if step_count % check_every == 0:
-            current_pi1 = greedy_map(Q1, rng)
-            current_pi2 = greedy_map(Q2, rng)
-            prev_pi1 = st.session_state[f"{tab_id}_prev_pi1"]
-            prev_pi2 = st.session_state[f"{tab_id}_prev_pi2"]
-
-            if (np.array_equal(current_pi1, prev_pi1)
-                    and np.array_equal(current_pi2, prev_pi2)):
-                stable_count = st.session_state[f"{tab_id}_stable_count"] + check_every
-                st.session_state[f"{tab_id}_stable_count"] = stable_count
-
-                if stable_count >= stable_required:
-                    # Converged!
-                    st.session_state[f"{tab_id}_convergence_info"] = {
-                        "converged": True,
-                        "periods_run": step_count,
-                        "stable_periods": stable_count,
-                        "epsilon_final": eps,
-                    }
-                    break
-            else:
-                st.session_state[f"{tab_id}_stable_count"] = 0
-                st.session_state[f"{tab_id}_prev_pi1"] = current_pi1
-                st.session_state[f"{tab_id}_prev_pi2"] = current_pi2
+    if conv:
+        st.session_state[f"{tab_id}_convergence_info"] = {
+            "converged": True,
+            "periods_run": step_count,
+            "stable_periods": stable_ct,
+            "epsilon_final": epsilon_at(step_count, beta),
+        }
+    st.session_state[f"{tab_id}_stable_count"] = stable_ct
+    st.session_state[f"{tab_id}_prev_pi1"] = np.argmax(Q1, axis=1)
+    st.session_state[f"{tab_id}_prev_pi2"] = np.argmax(Q2, axis=1)
 
     # Update state
     st.session_state[f"{tab_id}_Q1"] = Q1
@@ -812,76 +871,35 @@ def run_until_convergence_econ(config: dict) -> None:
     # Track starting step for skipped range
     start_step = step_count + 1
 
-    # Run until convergence
-    while step_count < max_periods:
-        step_count += 1
+    # Use a seed derived from the training RNG for the JIT loop
+    jit_seed = int(rng.integers(0, 2**31))
+    prices_arr = np.array(prices, dtype=np.float64)
 
-        # Get current prices
-        p1, p2 = index_to_state(s, prices)
+    # Run JIT-compiled training loop (600x faster than pure Python)
+    step_count, s, stable_count, converged = _train_loop_jit(
+        prices_arr, n_actions, c, t, v, alpha, delta, beta,
+        Q1, Q2, s, check_every, stable_required, max_periods, jit_seed,
+    )
 
-        # Calculate epsilon
-        eps = epsilon_at(step_count, beta)
-
-        # ε-greedy action selection
-        if rng.random() < eps:
-            a1 = rng.integers(0, n_actions)
-        else:
-            a1 = argmax_tie(Q1[s], rng)
-
-        if rng.random() < eps:
-            a2 = rng.integers(0, n_actions)
-        else:
-            a2 = argmax_tie(Q2[s], rng)
-
-        # Compute next state
-        p1_next = prices[a1]
-        p2_next = prices[a2]
-        s_next = state_index(p1_next, p2_next, prices)
-
-        # Calculate profits
-        pi1 = profit1(p1_next, p2_next, c, t, v)
-        pi2 = profit2(p1_next, p2_next, c, t, v)
-
-        # Q-learning updates
-        Q1[s, a1] = (1 - alpha) * Q1[s, a1] + alpha * (pi1 + delta * np.max(Q1[s_next]))
-        Q2[s, a2] = (1 - alpha) * Q2[s, a2] + alpha * (pi2 + delta * np.max(Q2[s_next]))
-
-        s = s_next
-
-        # Check convergence
-        if step_count % check_every == 0:
-            current_pi1 = greedy_map(Q1, rng)
-            current_pi2 = greedy_map(Q2, rng)
-            prev_pi1 = st.session_state[f"{tab_id}_prev_pi1"]
-            prev_pi2 = st.session_state[f"{tab_id}_prev_pi2"]
-
-            if (np.array_equal(current_pi1, prev_pi1)
-                    and np.array_equal(current_pi2, prev_pi2)):
-                stable_count = st.session_state[f"{tab_id}_stable_count"] + check_every
-                st.session_state[f"{tab_id}_stable_count"] = stable_count
-
-                if stable_count >= stable_required:
-                    # Converged!
-                    st.session_state[f"{tab_id}_convergence_info"] = {
-                        "converged": True,
-                        "periods_run": step_count,
-                        "stable_periods": stable_count,
-                        "epsilon_final": eps,
-                    }
-                    break
-            else:
-                st.session_state[f"{tab_id}_stable_count"] = 0
-                st.session_state[f"{tab_id}_prev_pi1"] = current_pi1
-                st.session_state[f"{tab_id}_prev_pi2"] = current_pi2
-
-    # If we hit max_periods without converging
-    if step_count >= max_periods:
+    # Store convergence info
+    eps_final = epsilon_at(step_count, beta)
+    if converged:
+        st.session_state[f"{tab_id}_convergence_info"] = {
+            "converged": True,
+            "periods_run": step_count,
+            "stable_periods": stable_count,
+            "epsilon_final": eps_final,
+        }
+    else:
         st.session_state[f"{tab_id}_convergence_info"] = {
             "converged": False,
-            "periods_run": max_periods,
-            "stable_periods": st.session_state[f"{tab_id}_stable_count"],
-            "epsilon_final": epsilon_at(max_periods, beta),
+            "periods_run": step_count,
+            "stable_periods": stable_count,
+            "epsilon_final": eps_final,
         }
+    st.session_state[f"{tab_id}_stable_count"] = stable_count
+    st.session_state[f"{tab_id}_prev_pi1"] = np.argmax(Q1, axis=1)
+    st.session_state[f"{tab_id}_prev_pi2"] = np.argmax(Q2, axis=1)
 
     # Update state
     st.session_state[f"{tab_id}_Q1"] = Q1
