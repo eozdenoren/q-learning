@@ -35,7 +35,7 @@ It is recommended to use a desktop computer for the best experience.
 st.markdown("---")
 st.markdown(
     '<p style="text-align: center; color: grey; font-size: 0.85em;">'
-    "&copy; 2025 Emre Ozdenoren. All rights reserved."
+    "&copy; 2026 Emre Ozdenoren. All rights reserved."
     "</p>",
     unsafe_allow_html=True,
 )

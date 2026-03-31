@@ -1094,3 +1094,11 @@ with tab_4:
             st.warning(
                 "⚠️ No cycle detected within max_steps. Consider adjusting starting prices or increasing max_steps."
             )
+
+st.markdown("---")
+st.markdown(
+    '<p style="text-align: center; color: grey; font-size: 0.85em;">'
+    "&copy; 2026 Emre Ozdenoren. All rights reserved."
+    "</p>",
+    unsafe_allow_html=True,
+)

@@ -250,3 +250,11 @@ with tab_2d:
     if st.session_state.get(autoplay_pending_key, False):
         st.session_state[autoplay_pending_key] = False
         st.rerun()
+
+st.markdown("---")
+st.markdown(
+    '<p style="text-align: center; color: grey; font-size: 0.85em;">'
+    "&copy; 2026 Emre Ozdenoren. All rights reserved."
+    "</p>",
+    unsafe_allow_html=True,
+)
