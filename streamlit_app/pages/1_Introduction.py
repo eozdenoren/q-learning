@@ -255,10 +255,10 @@ Luna is not programmed with a strategy — she has only a simple update rule and
 Yet a coherent strategy *emerges* from her experience. No one told Luna to walk toward the
 bone; she figured it out on her own.
 
-Now consider this: what if instead of one agent searching for a bone, we had *two* agents
-setting prices in a market? Each agent uses the same Q-learning algorithm, receiving
-profits as its reward. **What kind of pricing strategies might emerge — and would they be
-the strategies that economists expect?**
+Now consider this: what if instead of one agent searching for a bone, we had *two* gas
+stations setting fuel prices on a main road? Each station uses the same Q-learning
+algorithm, receiving profits as its reward. **What kind of pricing strategies might
+emerge — and would they be the strategies that economists expect?**
 
 Head to the **Economics Pricing Example** tab to find out.
     """

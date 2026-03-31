@@ -660,7 +660,7 @@ def step_agent_econ(config: dict) -> None:
     )
 
     step_entry_1 = {
-        "Player": "Scoopy Doo (Q1)",
+        "Player": "Station A (Q1)",
         "Step": step_count,
         "State (s)": f"s({p1:.1f},{p2:.1f})",
         "Action (a1)": f"{p1_next:.1f}",
@@ -686,7 +686,7 @@ def step_agent_econ(config: dict) -> None:
     )
 
     step_entry_2 = {
-        "Player": "Cone Solo (Q2)",
+        "Player": "Station B (Q2)",
         "Step": step_count,
         "State (s)": f"s({p1:.1f},{p2:.1f})",
         "Action (a1)": f"{p1_next:.1f}",

@@ -13,7 +13,7 @@ def render_price_history(
     step_count: int,
     starting_prices_picked: bool = True,
 ) -> None:
-    """Render 3-row table showing price history for Scoopy Doo and Cone Solo.
+    """Render 3-row table showing price history for Station A and Station B.
 
     Args:
         price_history: List of (step_num, p1, p2) tuples representing prices chosen at each step
@@ -102,7 +102,7 @@ def render_price_history(
     # Reverse the order so newest appears on the left (after the player column)
     display_items_reversed = list(reversed(display_items))
 
-    # Build table data: rows are Scoopy Doo, Cone Solo, Step; columns are steps
+    # Build table data: rows are Station A, Station B, Step; columns are steps
     alice_row = []
     bob_row = []
     step_row = []
@@ -129,11 +129,11 @@ def render_price_history(
         <table style="border-collapse: collapse; table-layout: fixed;">
             <tbody>
                 <tr>
-                    <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">👩🏼‍💼 Scoopy Doo</td>
+                    <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">⛽ Station A</td>
                     {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in alice_row])}
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">🧑🏼‍💼 Cone Solo</td>
+                    <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">⛽ Station B</td>
                     {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in bob_row])}
                 </tr>
                 <tr>

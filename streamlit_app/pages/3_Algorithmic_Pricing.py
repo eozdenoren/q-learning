@@ -46,18 +46,18 @@ tab_1, tab_2, tab_3, tab_4 = st.tabs(["The Environment", "Q-Learning & Competiti
 with tab_1:
     st.markdown(
         r"""
-        ### The Setup: Two Ice Cream Vans on a Beach
+        ### The Setup: Two Gas Stations on a Main Road
 
-        Picture a long, sandy beach stretching 1 km from end to end. Sunbathers are
-        spread evenly along the shore. At each end sits an ice cream van:
-        **Scoopy Doo** at the left end (position 0) and **Cone Solo** at the right
+        Picture a long main road stretching 1 km from end to end. Drivers are
+        spread evenly along the road. At each end sits a gas station:
+        **Station A** at the left end (position 0) and **Station B** at the right
         end (position 1).
 
-        Every sunbather wants exactly one ice cream. But walking in the hot sand is
-        unpleasant — the cost of walking $x$ km is $t \times x$, where $t$ is the
-        **transport cost**. Each sunbather values an ice cream at $v$.
+        Every driver wants exactly one litre of fuel. But driving further is
+        costly — the cost of driving $x$ km is $t \times x$, where $t$ is the
+        **transport cost**. Each driver values a litre of fuel at $v$.
 
-        **Demand.** A sunbather at position $x$ buys from Scoopy Doo if the net
+        **Demand.** A driver at position $x$ buys from Station A if the net
         benefit is higher:
 
         $$v - p_1 - t \cdot x \;\geq\; v - p_2 - t \cdot (1 - x)$$
@@ -66,16 +66,16 @@ with tab_1:
 
         $$q_1 = \frac{1}{2} + \frac{p_2 - p_1}{2t}, \qquad q_2 = \frac{1}{2} + \frac{p_1 - p_2}{2t}$$
 
-        Notice: $q_1 + q_2 = 1$ always — the whole beach buys. The transport cost $t$
-        controls how **differentiated** the products are. When $t$ is high, sunbathers
-        strongly prefer their nearby van even if it charges more. When $t$ is low,
+        Notice: $q_1 + q_2 = 1$ always — every driver on the road buys. The transport cost $t$
+        controls how **differentiated** the products are. When $t$ is high, drivers
+        strongly prefer their nearby station even if it charges more. When $t$ is low,
         they easily switch for a better price.
 
         **Profit.** Each firm earns margin times market share:
 
         $$\pi_1 = (p_1 - c) \times q_1, \qquad \pi_2 = (p_2 - c) \times q_2$$
 
-        where $c$ is the (common) marginal cost of producing an ice cream.
+        where $c$ is the (common) marginal cost of a litre of fuel.
 
         ---
 
@@ -87,11 +87,11 @@ with tab_1:
         $$p_e = c + t$$
 
         The markup equals the transport cost: firms can charge above cost because
-        nearby consumers prefer not to walk further. Nash profit per firm: $\pi_e = t/2$.
+        nearby drivers prefer not to drive further. Nash profit per firm: $\pi_e = t/2$.
 
         **The collusive price** ($p_c$). If the firms coordinate, they raise prices
         until consumers are just willing to buy. The binding constraint is that the
-        most distant consumer (at the midpoint) must still want ice cream:
+        most distant driver (at the midpoint) must still want fuel:
         $v - p - t/2 \geq 0$. This gives:
 
         $$p_c = v - \frac{t}{2}$$
@@ -139,12 +139,12 @@ with tab_2:
         1. Last period's prices — both its own and the competitor's: $(p_1, p_2)$. This is the **state**.
         2. Its own profit $\pi_i$ from that period. This is the **reward**.
 
-        That's it. Scoopy Doo does not know Cone Solo's cost, Q-table, or strategy.
-        Cone Solo does not know Scoopy Doo's. Each firm is learning in the dark, just like
+        That's it. Station A does not know Station B's cost, Q-table, or strategy.
+        Station B does not know Station A's. Each firm is learning in the dark, just like
         Luna had no idea where the bone was.
 
         **What does each firm choose?** Its own price for the next period. This is the **action**.
-        Scoopy Doo picks from the price grid $A = \{p^1, p^2, \ldots, p^m\}$, and so does Cone Solo.
+        Station A picks from the price grid $A = \{p^1, p^2, \ldots, p^m\}$, and so does Station B.
 
         **How does it learn?** Exactly the same Bellman update:
 
@@ -252,8 +252,8 @@ with tab_2:
 
         **Exercise 4: How differentiated are the products?**
         The parameter $t$ controls product differentiation (transport cost). Think
-        of $t$ as brand loyalty or switching cost: high $t$ is like iPhone vs Android
-        (ecosystem lock-in); low $t$ is like two petrol stations selling identical fuel.
+        of $t$ as brand loyalty or switching cost: high $t$ means drivers
+        strongly prefer the closer station; low $t$ means drivers easily switch for a better price.
         - Train with $t = 1.0$ (default). Note $\Delta$.
         - Try $t = 0.3$ (nearly identical — fierce competition, low Nash markup).
           What happens to $\Delta$? Is it stable across runs, or noisy?
@@ -270,10 +270,10 @@ with tab_2:
           markup, and the additional gain from collusion is relatively smaller.)*
 
         **Exercise 5: How essential is the product?**
-        The parameter $v$ controls how much consumers value the product — the maximum
-        they would pay. Think of high $v$ as medicine or heating fuel (consumers will
-        pay almost anything); low $v$ as fancy coffee (if the price is too high,
-        consumers walk away).
+        The parameter $v$ controls how much drivers value fuel — the maximum
+        they would pay. Think of high $v$ as a remote highway where fuel is essential
+        (drivers will pay almost anything); low $v$ as a city centre with public
+        transport alternatives (if the price is too high, drivers switch).
         - Train with $v = 3.0$ (default). Note $\Delta$.
         - Try $v = 2.6$ (just above the threshold $c + 3t/2 = 2.5$). What happens?
           Is there any collusion?
@@ -282,7 +282,7 @@ with tab_2:
         - *(Intuition: higher $v$ widens the gap between Nash and collusive profits,
           giving algorithms more room to extract supra-competitive prices. This is
           exactly why regulators worry about algorithmic pricing in essential goods
-          markets — pharmaceuticals, energy, food.)*
+          markets — fuel, pharmaceuticals, energy.)*
 
         **Exercise 6: The big picture**
         No one programmed these firms to collude. They never communicated. Each one
@@ -320,7 +320,7 @@ with tab_2:
           *(A fast learner quickly discovers that undercutting triggers retaliation.)*
 
         **Exercise C: Does the number of prices matter?**
-        Think of $m$ as the *pricing precision* of the algorithm. A petrol station
+        Think of $m$ as the *pricing precision* of the algorithm. A gas station
         that changes prices in 5-cent increments has a coarse grid; an airline
         pricing to the penny has a fine grid.
         - Compare $m = 7$ (coarse grid, $7^2 = 49$ states) with $m = 15$ (fine grid,
@@ -486,7 +486,7 @@ with tab_3:
     # --- B. Q-MATRICES ---
     col_q1, col_q2 = st.columns(2)
     with col_q1:
-        with st.expander(r"Q-Matrix: Scoopy Doo ($Q_1$)", expanded=False):
+        with st.expander(r"Q-Matrix: Station A ($Q_1$)", expanded=False):
             st.dataframe(
                 display_state["q_table_1"].style.highlight_max(
                     axis=1, color="lightgreen"
@@ -496,7 +496,7 @@ with tab_3:
             )
 
     with col_q2:
-        with st.expander(r"Q-Matrix: Cone Solo ($Q_2$)", expanded=False):
+        with st.expander(r"Q-Matrix: Station B ($Q_2$)", expanded=False):
             st.dataframe(
                 display_state["q_table_2"].style.highlight_max(
                     axis=1, color="lightgreen"
@@ -534,7 +534,7 @@ with tab_4:
     with col_q1:
         # upload 1st Q-table
         player_1_name = st.text_input(
-            "Enter your name", value="Scoopy Doo", key="player_1_name"
+            "Enter your name", value="Station A", key="player_1_name"
         )
         uploaded_file1 = st.file_uploader(
             "Upload your 1st Q-tables csv file", type="csv", key="q_table_upload_1"
@@ -554,7 +554,7 @@ with tab_4:
     with col_q2:
         # upload 2nd Q-table
         player_2_name = st.text_input(
-            "Enter your name", value="Cone Solo", key="player_2_name"
+            "Enter your name", value="Station B", key="player_2_name"
         )
         uploaded_file2 = st.file_uploader(
             "Upload your 2nd Q-tables csv file", type="csv", key="q_table_upload_2"
@@ -971,7 +971,7 @@ with tab_4:
                         }
                     )
 
-                # Build table data: rows are Scoopy Doo, Cone Solo, Step; columns are trajectory steps
+                # Build table data: rows are Station A, Station B, Step; columns are trajectory steps
                 alice_row = []
                 bob_row = []
                 step_row = []

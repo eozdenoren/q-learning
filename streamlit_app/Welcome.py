@@ -10,15 +10,16 @@ st.title("Q-Learning Demo")
 
 st.markdown(
     """
-Welcome! 
+Welcome!
 
-In this webpage, we will learn about Q-learning, a type of reinforcement learning algorithm. 
+In this webpage, we will learn about Q-learning, a type of reinforcement learning algorithm.
 
 We will start with a simple example of a dog learning to find the bone in a 1D grid.
 
 Then, we will explore a more complex example of a dog learning to find the bone in a 2D grid.
 
-Finally, we will explore Q-learning's application in economics pricing strategies.
+Finally, we will explore Q-learning's application in economics pricing strategies,
+where two gas stations on a main road use algorithms to set fuel prices.
 
 Use the sidebar on the left to navigate between the pages:
 
@@ -29,4 +30,12 @@ Use the sidebar on the left to navigate between the pages:
 
 It is recommended to use a desktop computer for the best experience.
 """
+)
+
+st.markdown("---")
+st.markdown(
+    '<p style="text-align: center; color: grey; font-size: 0.85em;">'
+    "&copy; 2025 Emre Ozdenoren. All rights reserved."
+    "</p>",
+    unsafe_allow_html=True,
 )

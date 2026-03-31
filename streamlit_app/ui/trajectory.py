@@ -302,23 +302,23 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
     col1, col2 = st.columns(2)
     with col1:
         start_p1 = st.number_input(
-            r"Starting price for Scoopy Doo ($p_1$):",
+            r"Starting price for Station A ($p_1$):",
             min_value=float(min(prices)),
             max_value=float(max(prices)),
             value=float(prices[len(prices) // 2]),
             step=0.1,
             key=f"{tab_id}_traj_p1",
-            help="Starting price for player 1 (Scoopy Doo)",
+            help="Starting price for player 1 (Station A)",
         )
     with col2:
         start_p2 = st.number_input(
-            r"Starting price for Cone Solo ($p_2$):",
+            r"Starting price for Station B ($p_2$):",
             min_value=float(min(prices)),
             max_value=float(max(prices)),
             value=float(prices[len(prices) // 2]),
             step=0.1,
             key=f"{tab_id}_traj_p2",
-            help="Starting price for player 2 (Cone Solo)",
+            help="Starting price for player 2 (Station B)",
         )
 
     # Validate and normalize prices to exact values in PRICES list (handles floating-point precision)
@@ -401,7 +401,7 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
                         }
                     )
 
-                # Build table data: rows are Scoopy Doo, Cone Solo, Step; columns are trajectory steps
+                # Build table data: rows are Station A, Station B, Step; columns are trajectory steps
                 alice_row = []
                 bob_row = []
                 step_row = []
@@ -422,11 +422,11 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
                     <table style="border-collapse: collapse; table-layout: fixed;">
                         <tbody>
                             <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">👩🏼‍💼 Scoopy Doo p₁</td>
+                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">⛽ Station A p₁</td>
                                 {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in alice_row])}
                             </tr>
                             <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">🧑🏼‍💼 Cone Solo p₂</td>
+                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">⛽ Station B p₂</td>
                                 {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in bob_row])}
                             </tr>
                             <tr>
@@ -517,11 +517,11 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
                     <table style="border-collapse: collapse; table-layout: fixed;">
                         <tbody>
                             <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">👩🏼‍💼 Scoopy Doo π₁</td>
+                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">⛽ Station A π₁</td>
                                 {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in alice_profit_row])}
                             </tr>
                             <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">🧑🏼‍💼 Cone Solo π₂</td>
+                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">⛽ Station B π₂</td>
                                 {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in bob_profit_row])}
                             </tr>
                             <tr>
@@ -545,8 +545,8 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
                 st.markdown(
                     f"""Cycle detected: starts at step {loop_start}, ends at step {loop_start + len(loop)-1}, length = {len(loop)}<br>
                     <br>
-                    The average price for Scoopy Doo is {average_p1:.1f}, and for Cone Solo is {average_p2:.1f};<br>
-                    and the average profit for Scoopy Doo is {average_profit_alice:.2f}, and for Cone Solo is {average_profit_bob:.2f}.<br>
+                    The average price for Station A is {average_p1:.1f}, and for Station B is {average_p2:.1f};<br>
+                    and the average profit for Station A is {average_profit_alice:.2f}, and for Station B is {average_profit_bob:.2f}.<br>
                     <br>
                     Remember that the equilibrium price is {p_e:.1f}, and the collusion price is {p_c:.1f}; 
                     <br>
@@ -570,8 +570,8 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
                         $\Delta = \dfrac{{\pi_{{\text{{avg}}}} - \pi_{{\text{{equilibrium}}}}}}{{\pi_{{\text{{collusion}}}} - \pi_{{\text{{equilibrium}}}}}}$. <br>
                         <br>
                         Hence the normalised profit <br>
-                        for Scoopy Doo is: $\Delta_{{\text{{Scoopy Doo}}}} = \dfrac{{{average_profit_alice:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_alice:.2f}$, <br>
-                        and for Cone Solo is: $\Delta_{{\text{{Cone Solo}}}} = \dfrac{{{average_profit_bob:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_bob:.2f}$.<br>
+                        for Station A is: $\Delta_{{\text{{Station A}}}} = \dfrac{{{average_profit_alice:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_alice:.2f}$, <br>
+                        and for Station B is: $\Delta_{{\text{{Station B}}}} = \dfrac{{{average_profit_bob:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_bob:.2f}$.<br>
                         """,
                         unsafe_allow_html=True,
                     )
