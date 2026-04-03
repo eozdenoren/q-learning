@@ -41,174 +41,65 @@ st.markdown(
     """
 )
 
-tab_1, tab_2, tab_3, tab_ex = st.tabs(["The Environment", "Q-Learning & Competition", "Training", "Exercises"])
+tab_1, tab_3, tab_ex = st.tabs(["The Environment", "Training", "Exercises"])
 # Pricing Battle tab hidden for now — will be introduced later
 
 with tab_1:
     st.markdown(
         r"""
-        ### The Setup: Two Gas Stations on a Main Road
+### Two Gas Stations, Each Running Q-Learning
 
-        Picture a long main road stretching 1 km from end to end. Drivers are
-        spread evenly along the road. At each end sits a gas station:
-        **Station A** at the left end (position 0) and **Station B** at the right
-        end (position 1).
+Two gas stations sit on opposite ends of a main road (the Hotelling model from
+the lecture). Each station uses its own Q-learning algorithm to set prices.
+The algorithms do not communicate — each observes only its own profit.
 
-        Every driver wants exactly one litre of fuel. But driving further is
-        costly — the cost of driving $x$ km is $t \times x$, where $t$ is the
-        **transport cost**. Each driver values a litre of fuel at $v$.
+**State** = last period's price pair $(p_1, p_2)$
 
-        **Demand.** A driver at position $x$ buys from Station A if the net
-        benefit is higher:
+**Action** = choose a new price from a grid of $m$ prices
 
-        $$v - p_1 - t \cdot x \;\geq\; v - p_2 - t \cdot (1 - x)$$
+**Reward** = own profit $\pi_i = (p_i - c) \times q_i$
 
-        Solving for the **indifferent consumer** at $\hat{x} = \tfrac{1}{2} + \tfrac{p_2 - p_1}{2t}$:
+Each firm updates its Q-table independently using the same Bellman rule as Luna:
 
-        $$q_1 = \frac{1}{2} + \frac{p_2 - p_1}{2t}, \qquad q_2 = \frac{1}{2} + \frac{p_1 - p_2}{2t}$$
+$$Q_i(s, a_i) \leftarrow Q_i(s, a_i) + \alpha \left[ \pi_i + \gamma \max_{a_i'} Q_i(s', a_i') - Q_i(s, a_i) \right]$$
 
-        Notice: $q_1 + q_2 = 1$ always — every driver on the road buys. The transport cost $t$
-        controls how **differentiated** the products are. When $t$ is high, drivers
-        strongly prefer their nearby station even if it charges more. When $t$ is low,
-        they easily switch for a better price.
+**The question:** do the algorithms converge to the Nash price ($p_e = c + t$)
+or learn to sustain supra-competitive prices closer to the collusive level
+($p_c = v - t/2$)?
 
-        **Profit.** Each firm earns margin times market share:
+---
 
-        $$\pi_1 = (p_1 - c) \times q_1, \qquad \pi_2 = (p_2 - c) \times q_2$$
+### Measuring the Outcome: The Collusion Index $\Delta$
 
-        where $c$ is the (common) marginal cost of a litre of fuel.
+After training, the algorithms settle into a pricing cycle. We measure where
+they ended up using:
 
-        ---
+$$\Delta_i = \frac{\bar{\pi}_i - \pi_e}{\pi_c - \pi_e}$$
 
-        ### Two Benchmarks
+| $\Delta$ | Meaning |
+|-----------|---------|
+| 0 | Nash (competitive) profit |
+| 1 | Full collusion profit |
+| Between 0 and 1 | Supra-competitive — partial collusion |
+| Negative | Worse than Nash — being exploited |
 
-        **The competitive (Nash) price** ($p_e$). Each firm maximises its own profit
-        taking the rival's price as given. The first-order condition gives:
-
-        $$p_e = c + t$$
-
-        The markup equals the transport cost: firms can charge above cost because
-        nearby drivers prefer not to drive further. Nash profit per firm: $\pi_e = t/2$.
-
-        **The collusive price** ($p_c$). If the firms coordinate, they raise prices
-        until consumers are just willing to buy. The binding constraint is that the
-        most distant driver (at the midpoint) must still want fuel:
-        $v - p - t/2 \geq 0$. This gives:
-
-        $$p_c = v - \frac{t}{2}$$
-
-        Collusion profit per firm: $\pi_c = (v - t/2 - c)/2$. The gap
-        $v - c - 3t/2$ measures the **room for collusion** — how much more firms
-        can extract by coordinating versus competing.
-
+$\Delta$ is computed separately for each firm and varies across runs due to
+randomness in exploration.
         """
     )
 
     with st.expander("Technical details", expanded=False):
         st.markdown(
             r"""
-            **Action space.** Each firm chooses from $m$ equally spaced prices in the range
-            $[2p_e - p_c,\; 2p_c - p_e]$, following Calvano et al. (2020). This range is
-            centred between the competitive and collusive prices, giving the algorithms room
-            to explore prices below $p_e$ (aggressive undercutting) and above $p_c$ (extreme
-            collusion).
+**Price grid.** Each firm chooses from $m$ equally spaced prices in
+$[2p_e - p_c,\; 2p_c - p_e]$, following Calvano et al. (2020).
 
-            **State space.** The state is last period's price pair $(p_1, p_2)$. With $m$
-            prices per firm, there are $m^2$ possible states.
-
-            **Example.** With $c = 1$, $t = 1$, $v = 3$: the Nash price is
-            $p_e = 2.0$, the collusive price is $p_c = 2.5$, and with $m = 15$
-            there are $225$ states.
-
-            **Why Hotelling?** This demand model has two key properties:
-            - **Bounded demand**: total quantity is always 1, so profits cannot blow up.
-            - **No super-collusion**: symmetric pricing is always optimal — asymmetric
-              alternating strategies that plagued the linear demand model cannot arise.
+**Exploration decay.** Exploration rate declines as $\varepsilon_t = e^{-\beta t}$.
+Early on, firms explore wildly; over time, they exploit what they've learned.
+This is necessary because the environment includes the other firm, which is
+also learning — permanent exploration would prevent convergence.
             """
         )
-
-with tab_2:
-    st.markdown(
-        r"""
-        ### From Bones to Prices
-
-        When Luna searched for the bone, she had a Q-table with one row per position and
-        one column per action (Left, Right). The same idea applies here — but now **each
-        firm is its own Luna**.
-
-        **What does each firm observe?** Only two things:
-        1. Last period's prices — both its own and the competitor's: $(p_1, p_2)$. This is the **state**.
-        2. Its own profit $\pi_i$ from that period. This is the **reward**.
-
-        That's it. Station A does not know Station B's cost, Q-table, or strategy.
-        Station B does not know Station A's. Each firm is learning in the dark, just like
-        Luna had no idea where the bone was.
-
-        **What does each firm choose?** Its own price for the next period. This is the **action**.
-        Station A picks from the price grid $A = \{p^1, p^2, \ldots, p^m\}$, and so does Station B.
-
-        **How does it learn?** Exactly the same Bellman update:
-
-        $$Q_i(s, a_i) \leftarrow Q_i(s, a_i) + \alpha \left[ \pi_i + \gamma \max_{a_i'} Q_i(s', a_i') - Q_i(s, a_i) \right]$$
-
-        where $s = (p_1, p_2)$ is last period's price pair, $a_i$ is the price firm $i$
-        chose, $\pi_i$ is the profit it earned, and $s'$ is the new price pair. Each firm
-        maintains its own Q-table and updates it independently.
-
-        **Declining exploration.** In the bone problem, Luna used a fixed exploration rate
-        $\varepsilon$ — she kept experimenting at the same rate forever. In the pricing game,
-        we use a **declining** exploration rate:
-
-        $$\varepsilon_t = e^{-\beta t}$$
-
-        where $t$ is the current period and $\beta$ is a small decay parameter. Early on,
-        $\varepsilon_t$ is close to 1, so both firms explore wildly — trying random prices to
-        learn about the market. Over time, $\varepsilon_t$ shrinks toward 0, and the firms
-        increasingly exploit what they've learned, settling into their best-response pricing.
-
-        Why decline? Because the environment here includes the *other firm*, which is also
-        learning. If both firms explored forever, they would keep disrupting each other and
-        never settle down. The declining rate lets them explore enough to build good Q-tables,
-        then gradually lock in their strategies. Think of it as a transition from
-        experimentation to commitment.
-
-        ---
-
-        ### Measuring the Outcome
-
-        After training converges, the algorithms settle into a pricing cycle. To measure
-        where they ended up, we use two benchmarks from the Environment tab: the
-        competitive (Nash) profit $\pi_e$ and the collusive profit $\pi_c$. The
-        **normalised profit** $\Delta$ for each firm measures where it landed:
-
-        $$\Delta_i = \frac{\bar{\pi}_i - \pi_e}{\pi_c - \pi_e}$$
-
-        where $\bar{\pi}_i$ is firm $i$'s average profit in the converged pricing cycle.
-
-        - $\Delta_i = 0$: firm $i$ earns the competitive (Nash) profit.
-        - $\Delta_i = 1$: firm $i$ earns the full collusive profit.
-        - $\Delta_i > 0$: firm $i$ earns more than in Nash — supra-competitive profits.
-        - $\Delta_i < 0$: firm $i$ earns *less* than in Nash — it is being exploited.
-
-        **Important:** $\Delta$ is computed separately for each firm. The two firms may
-        end up in very different positions. One firm might earn supra-competitive profits
-        ($\Delta > 0$) while the other earns less than Nash ($\Delta < 0$). This happens
-        when the converged cycle is **asymmetric** — the firms settle on different prices.
-
-        The outcome also varies across training runs due to the randomness in exploration.
-        Train the same parameters twice and you may get very different $\Delta$ values.
-        Whether and when collusion emerges is an empirical question — not a foregone
-        conclusion.
-
-        After training, scroll to the **Pricing Simulation** section at the bottom of the
-        Training tab. It computes the converged pricing cycle and reports $\Delta$ for each
-        firm automatically.
-
-        After training, scroll to the **Pricing Simulation** section at the bottom of the
-        Training tab. It computes the converged pricing cycle and reports $\Delta$ for each
-        firm automatically.
-        """
-    )
 
 with tab_ex:
     st.markdown(
