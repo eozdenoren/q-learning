@@ -142,40 +142,20 @@ def render_training_controls(
             reset_episode_fn(config)
             st.rerun()
     else:
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            # Not ready: show "Take Next Step" button
-            if st.button(
-                "👟 Take Next Step", key=f"{tab_id}_step"
-            ):
-                # Stop autoplay if manually stepping
-                autoplay_key = f"{tab_id}_autoplay_active"
-                autoplay_last_step_key = f"{tab_id}_autoplay_last_step_time"
-                if autoplay_key in st.session_state:
-                    st.session_state[autoplay_key] = False
-                if autoplay_last_step_key in st.session_state:
-                    del st.session_state[autoplay_last_step_key]
-                jump_to_latest(config)
-                step_agent_fn(config)
-                st.rerun()
-        with col2:
+        # Not ready: show "Take Next Step" button
+        if st.button(
+            "👟 Take Next Step", key=f"{tab_id}_step"
+        ):
+            # Stop autoplay if manually stepping
             autoplay_key = f"{tab_id}_autoplay_active"
-            if st.button(
-                "⏩ Autoplay to complete this episode step by step",
-                key=f"{tab_id}_autoplay",
-            ):
-                # Start autoplay
-                autoplay_last_step_key = f"{tab_id}_autoplay_last_step_time"
-                autoplay_pending_rerun_key = f"{tab_id}_autoplay_pending_rerun"
-                st.session_state[autoplay_key] = True
-                # Reset timer and take first step immediately
-                jump_to_latest(config)
-                step_agent_fn(config)
-                st.session_state[autoplay_last_step_key] = time.time()
-                ready_after_step = st.session_state.get(
-                    f"{tab_id}_ready_for_episode", True
-                )
-                st.session_state[autoplay_pending_rerun_key] = not ready_after_step
+            autoplay_last_step_key = f"{tab_id}_autoplay_last_step_time"
+            if autoplay_key in st.session_state:
+                st.session_state[autoplay_key] = False
+            if autoplay_last_step_key in st.session_state:
+                del st.session_state[autoplay_last_step_key]
+            jump_to_latest(config)
+            step_agent_fn(config)
+            st.rerun()
 
     # Fast forward section
     if ready:

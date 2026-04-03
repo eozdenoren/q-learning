@@ -89,15 +89,17 @@ def q_learning_parameters(tab_id: str) -> dict:
       alpha, gamma, epsilon, reward_val, tab_id
     """
 
-    col_a, col_g, col_e, col_r = st.columns([1, 1, 1, 1])
+    col_a, col_g, col_e = st.columns([1, 1, 1])
 
     with col_a:
         alpha: float = st.slider(
-            r"$\alpha$ (Learning Rate)", 0.0, 1.0, 0.5, 0.01, key=f"{tab_id}_alpha"
+            r"$\alpha$ (Learning Rate)", 0.0, 1.0, 0.5, 0.01, key=f"{tab_id}_alpha",
+            help="How much Luna adjusts toward new information. High = learn fast, low = learn slowly.",
         )
     with col_g:
         gamma: float = st.slider(
-            r"$\gamma$ (Discount Factor)", 0.0, 1.0, 0.9, 0.01, key=f"{tab_id}_gamma"
+            r"$\gamma$ (Discount Factor)", 0.0, 1.0, 0.9, 0.01, key=f"{tab_id}_gamma",
+            help="How much Luna values future rewards. High = patient, low = myopic.",
         )
     with col_e:
         epsilon: float = st.slider(
@@ -107,11 +109,10 @@ def q_learning_parameters(tab_id: str) -> dict:
             0.2,
             0.01,
             key=f"{tab_id}_epsilon",
+            help="How often Luna tries a random action instead of following the Q-table.",
         )
-    with col_r:
-        reward_val: float = st.number_input(
-            r"Reward Value $r$", value=1.0, key=f"{tab_id}_reward"
-        )
+
+    reward_val = 10.0  # Fixed reward value
 
     return {
         "alpha": alpha,
@@ -128,8 +129,8 @@ def parameters_1d(tab_id: str) -> dict:
       start_pos, end_pos, goal_pos, start_mode, fixed_start_pos,
       alpha, gamma, epsilon, reward_val, tab_id
     """
-    # Row 1: Environment Settings
-    with st.expander("🐶 Environment Settings", expanded=True):
+    # Row 1: Environment Settings (collapsed by default — most students won't need to change these)
+    with st.expander("🐶 Environment Settings", expanded=False):
         # Top row: position inputs side by side
         col1, col2, col3 = st.columns(3)
 
