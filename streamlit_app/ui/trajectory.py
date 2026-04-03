@@ -367,88 +367,15 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
     traj_start = st.session_state.get(f"{tab_id}_trajectory_start")
 
     if traj and traj_start:
-        # Check if the trajectory matches current starting prices
         if traj_start != (start_p1, start_p2):
-            # Clear old trajectory if starting prices changed
             st.session_state[f"{tab_id}_trajectory"] = None
             st.session_state[f"{tab_id}_trajectory_start"] = None
         else:
-            # Display trajectory
             path = traj["path"]
             loop = traj["loop"]
             loop_start = traj["loop_start"]
 
-            st.markdown(r"**Trajectory Steps for $p_1, p_2$ :**")
-
-            # Display path in table format (similar to price history)
-            if path:
-                # Add step 0 with starting prices at the beginning
-                # Renumber path steps to 1, 2, 3... (since path starts from t=0)
-                full_path = [
-                    {
-                        "step_num": 0,
-                        "a1_price": start_p1,
-                        "a2_price": start_p2,
-                    }
-                ]
-                # Add path steps, renumbering them starting from 1
-                for i, rec in enumerate(path, start=1):
-                    full_path.append(
-                        {
-                            "step_num": i,
-                            "a1_price": rec["a1_price"],
-                            "a2_price": rec["a2_price"],
-                        }
-                    )
-
-                # Build table data: rows are Station A, Station B, Step; columns are trajectory steps
-                alice_row = []
-                bob_row = []
-                step_row = []
-
-                # Fixed column width: calculate width to show 10 columns consistently
-                num_visible_cols = 10
-                fixed_col_width = "90px"  # Fixed width per column
-
-                for rec in full_path:
-                    alice_row.append(f"{rec['a1_price']:.1f}")
-                    bob_row.append(f"{rec['a2_price']:.1f}")
-                    step_row.append(f"Step {rec['step_num']}")
-
-                # Create HTML table with horizontal scroll, no header, fixed column width
-                table_id = f"trajectory_table_{id(path)}"
-                html_table = f"""
-                <div id="{table_id}_container" style="width: 100%; overflow-x: auto; overflow-y: hidden; border: 1px solid #ddd; border-radius: 5px;">
-                    <table style="border-collapse: collapse; table-layout: fixed;">
-                        <tbody>
-                            <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">⛽ Station A p₁</td>
-                                {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in alice_row])}
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">⛽ Station B p₂</td>
-                                {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in bob_row])}
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">Step</td>
-                                {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; font-size: 0.85em; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in step_row])}
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                """
-
-                st.markdown(html_table, unsafe_allow_html=True)
-
-                if len(full_path) > num_visible_cols:
-                    st.caption(
-                        "Scroll horizontally to see all steps. The newest steps appear on the left."
-                    )
-
-            # Trajectory table for profit steps
-            st.markdown(r"**Trajectory Steps for $\pi_1, \pi_2$ :**")
-
-            # Get profit calculation parameters from session state
+            # Get parameters
             c = st.session_state.get(f"{tab_id}_cfg_c", 0.0)
             t = st.session_state.get(f"{tab_id}_cfg_t", 1.0)
             v = st.session_state.get(f"{tab_id}_cfg_v", 3.0)
@@ -457,167 +384,96 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
             profit_e = st.session_state.get(f"{tab_id}_cfg_profit_e", 0.0)
             profit_c = st.session_state.get(f"{tab_id}_cfg_profit_c", 0.0)
 
-            # Calculate average profits in the loop
-            average_profit_alice = 0.0
-            average_profit_bob = 0.0
             if loop_start is not None and loop:
-                loop_profits_alice = []
-                loop_profits_bob = []
-                loop_prices_alice = []
-                loop_prices_bob = []
-                for rec in loop:
-                    p1 = rec["a1_price"]
-                    p2 = rec["a2_price"]
-                    loop_prices_alice.append(p1)
-                    loop_prices_bob.append(p2)
-                    pi1 = profit1(p1, p2, c, t, v)
-                    pi2 = profit2(p1, p2, c, t, v)
-                    loop_profits_alice.append(pi1)
-                    loop_profits_bob.append(pi2)
-                average_p1 = (
-                    sum(loop_prices_alice) / len(loop_prices_alice)
-                    if loop_prices_alice
-                    else 0.0
-                )
-                average_p2 = (
-                    sum(loop_prices_bob) / len(loop_prices_bob)
-                    if loop_prices_bob
-                    else 0.0
-                )
-                average_profit_alice = (
-                    sum(loop_profits_alice) / len(loop_profits_alice)
-                    if loop_profits_alice
-                    else 0.0
-                )
-                average_profit_bob = (
-                    sum(loop_profits_bob) / len(loop_profits_bob)
-                    if loop_profits_bob
-                    else 0.0
-                )
+                # Compute cycle averages
+                loop_prices_a = [rec["a1_price"] for rec in loop]
+                loop_prices_b = [rec["a2_price"] for rec in loop]
+                loop_profits_a = [profit1(p1, p2, c, t, v) for p1, p2 in zip(loop_prices_a, loop_prices_b)]
+                loop_profits_b = [profit2(p1, p2, c, t, v) for p1, p2 in zip(loop_prices_a, loop_prices_b)]
+                avg_p1 = sum(loop_prices_a) / len(loop_prices_a)
+                avg_p2 = sum(loop_prices_b) / len(loop_prices_b)
+                avg_profit_a = sum(loop_profits_a) / len(loop_profits_a)
+                avg_profit_b = sum(loop_profits_b) / len(loop_profits_b)
 
-            if path:
-                # Calculate profits for each step in full_path
-                alice_profit_row = []
-                bob_profit_row = []
-                step_row_profit = []
-
-                for rec in full_path:
-                    p1 = rec["a1_price"]
-                    p2 = rec["a2_price"]
-                    pi1 = profit1(p1, p2, c, t, v)
-                    pi2 = profit2(p1, p2, c, t, v)
-                    alice_profit_row.append(f"{pi1:.2f}")
-                    bob_profit_row.append(f"{pi2:.2f}")
-                    step_row_profit.append(f"Step {rec['step_num']}")
-
-                # Create HTML table for profits with horizontal scroll, fixed column width
-                table_id_profit = f"trajectory_profit_table_{id(path)}"
-                html_table_profit = f"""
-                <div id="{table_id_profit}_container" style="width: 100%; overflow-x: auto; overflow-y: hidden; border: 1px solid #ddd; border-radius: 5px;">
-                    <table style="border-collapse: collapse; table-layout: fixed;">
-                        <tbody>
-                            <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">⛽ Station A π₁</td>
-                                {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in alice_profit_row])}
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">⛽ Station B π₂</td>
-                                {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in bob_profit_row])}
-                            </tr>
-                            <tr>
-                                <td style="padding: 10px; border-right: 2px solid #ddd; position: sticky; left: 0; background-color: white; z-index: 9; font-weight: bold; min-width: 100px; width: 100px;">Step</td>
-                                {' '.join([f'<td style="padding: 10px; text-align: center; border: 1px solid #ddd; font-size: 0.85em; width: {fixed_col_width}; min-width: {fixed_col_width};">{val}</td>' for val in step_row_profit])}
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                """
-
-                st.markdown(html_table_profit, unsafe_allow_html=True)
-
-                if len(full_path) > num_visible_cols:
-                    st.caption(
-                        "💡 Scroll horizontally to see all steps. The newest steps appear on the right."
-                    )
-
-            # Display cycle if detected
-            if loop_start is not None and loop:
-                st.markdown(
-                    f"""Cycle detected: starts at step {loop_start}, ends at step {loop_start + len(loop)-1}, length = {len(loop)}<br>
-                    <br>
-                    The average price for Station A is {average_p1:.1f}, and for Station B is {average_p2:.1f};<br>
-                    and the average profit for Station A is {average_profit_alice:.2f}, and for Station B is {average_profit_bob:.2f}.<br>
-                    <br>
-                    Remember that the equilibrium price is {p_e:.1f}, and the collusion price is {p_c:.1f}; 
-                    <br>
-                    and the profit of nash equilibrium is {profit_e:.2f}, and the profit of collusion is {profit_c:.2f}.<br>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                # Calculate normalized profits
                 denominator = profit_c - profit_e
-                if abs(denominator) > 1e-10:  # Avoid division by zero
-                    normalized_profit_alice = (
-                        average_profit_alice - profit_e
-                    ) / denominator
-                    normalized_profit_bob = (
-                        average_profit_bob - profit_e
-                    ) / denominator
-                    st.markdown(
-                        rf"""
-                        The normalised profit is calculated as the difference between the average profit and the equilibrium profit,
-                        divided by the difference between collusion profit and equilibrium profit: <br>
-                        $\Delta = \dfrac{{\pi_{{\text{{avg}}}} - \pi_{{\text{{equilibrium}}}}}}{{\pi_{{\text{{collusion}}}} - \pi_{{\text{{equilibrium}}}}}}$. <br>
-                        <br>
-                        Hence the normalised profit <br>
-                        for Station A is: $\Delta_{{\text{{Station A}}}} = \dfrac{{{average_profit_alice:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_alice:.2f}$, <br>
-                        and for Station B is: $\Delta_{{\text{{Station B}}}} = \dfrac{{{average_profit_bob:.2f} - {profit_e:.2f}}}{{{profit_c:.2f} - {profit_e:.2f}}} = {normalized_profit_bob:.2f}$.<br>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+                if abs(denominator) > 1e-10:
+                    delta_a = (avg_profit_a - profit_e) / denominator
+                    delta_b = (avg_profit_b - profit_e) / denominator
+                else:
+                    delta_a = delta_b = float("nan")
 
-                    # Auto-save to experiment log (once per simulation)
-                    # Build cycle string: (p1,p2) → (p1,p2) → ...
+                # --- RESULTS: prominent metrics ---
+                st.markdown("### Results")
+
+                col_da, col_db = st.columns(2)
+                with col_da:
+                    if not np.isnan(delta_a):
+                        color = "normal" if delta_a > 0.05 else "off"
+                        st.metric("Station A: Δ", f"{delta_a:.2f}")
+                    st.caption(f"Avg price: {avg_p1:.2f}  |  Avg profit: {avg_profit_a:.3f}")
+                with col_db:
+                    if not np.isnan(delta_b):
+                        st.metric("Station B: Δ", f"{delta_b:.2f}")
+                    st.caption(f"Avg price: {avg_p2:.2f}  |  Avg profit: {avg_profit_b:.3f}")
+
+                # Interpretation
+                avg_delta = (delta_a + delta_b) / 2 if not (np.isnan(delta_a) or np.isnan(delta_b)) else 0
+                if avg_delta > 0.7:
+                    st.error(f"**Strong collusion.** Both firms earn well above Nash (Δ ≈ {avg_delta:.2f}).")
+                elif avg_delta > 0.3:
+                    st.warning(f"**Partial collusion.** Prices are above Nash but below full collusion (Δ ≈ {avg_delta:.2f}).")
+                elif avg_delta > 0.05:
+                    st.info(f"**Mild supra-competitive pricing.** Slightly above Nash (Δ ≈ {avg_delta:.2f}).")
+                else:
+                    st.success(f"**Near-competitive.** Close to Nash equilibrium (Δ ≈ {avg_delta:.2f}).")
+
+                # Benchmarks for reference
+                st.caption(
+                    f"Benchmarks — Nash: p = {p_e:.2f}, π = {profit_e:.3f}  |  "
+                    f"Collusion: p = {p_c:.2f}, π = {profit_c:.3f}  |  "
+                    f"Cycle length: {len(loop)}"
+                )
+
+                # Cycle details in expander
+                with st.expander("Show pricing cycle details", expanded=False):
                     cycle_str = " → ".join(
-                        f"({rec['a1_price']:.1f},{rec['a2_price']:.1f})"
+                        f"({rec['a1_price']:.1f}, {rec['a2_price']:.1f})"
                         for rec in loop
                     )
-                    # Build transient path: starting prices → ... → cycle start
-                    transient_steps = path[:loop_start] if loop_start else []
-                    transient_str = " → ".join(
-                        [f"({start_p1:.1f},{start_p2:.1f})"] +
-                        [f"({rec['a1_price']:.1f},{rec['a2_price']:.1f})"
-                         for rec in transient_steps]
-                    )
+                    st.markdown(f"**Cycle:** {cycle_str}")
 
-                    save_key = f"{tab_id}_last_saved_sim"
-                    save_id = (st.session_state.get(f"{tab_id}_step_count", 0),
-                               start_p1, start_p2)
-                    if st.session_state.get(save_key) != save_id:
-                        save_experiment(
-                            tab_id,
-                            delta_1=normalized_profit_alice,
-                            delta_2=normalized_profit_bob,
-                            cycle_length=len(loop),
-                            avg_p1=average_p1,
-                            avg_p2=average_p2,
-                            avg_profit_1=average_profit_alice,
-                            avg_profit_2=average_profit_bob,
-                            start_p1=start_p1,
-                            start_p2=start_p2,
-                            cycle_prices=cycle_str,
-                            transient_prices=transient_str,
-                        )
-                        st.session_state[save_key] = save_id
-                else:
-                    st.markdown(
-                        r"""
-                        The normalised profit cannot be calculated because the denominator 
-                        (collusion profit - equilibrium profit) is zero.
-                        """,
-                        unsafe_allow_html=True,
-                    )
-            else:
-                st.info(
-                    "No cycle detected within max_steps. Consider increasing max_steps."
+                    if path:
+                        # Show price trajectory as a simple dataframe
+                        full_path = [{"Step": 0, "p₁": start_p1, "p₂": start_p2}]
+                        for i, rec in enumerate(path, 1):
+                            full_path.append({"Step": i, "p₁": rec["a1_price"], "p₂": rec["a2_price"]})
+
+                        import pandas as pd
+                        df = pd.DataFrame(full_path).set_index("Step")
+                        st.dataframe(df, height=300)
+
+                # Auto-save to experiment log
+                cycle_str = " → ".join(
+                    f"({rec['a1_price']:.1f},{rec['a2_price']:.1f})" for rec in loop
                 )
+                transient_steps = path[:loop_start] if loop_start else []
+                transient_str = " → ".join(
+                    [f"({start_p1:.1f},{start_p2:.1f})"] +
+                    [f"({rec['a1_price']:.1f},{rec['a2_price']:.1f})" for rec in transient_steps]
+                )
+                save_key = f"{tab_id}_last_saved_sim"
+                save_id = (st.session_state.get(f"{tab_id}_step_count", 0), start_p1, start_p2)
+                if st.session_state.get(save_key) != save_id:
+                    save_experiment(
+                        tab_id,
+                        delta_1=delta_a, delta_2=delta_b,
+                        cycle_length=len(loop),
+                        avg_p1=avg_p1, avg_p2=avg_p2,
+                        avg_profit_1=avg_profit_a, avg_profit_2=avg_profit_b,
+                        start_p1=start_p1, start_p2=start_p2,
+                        cycle_prices=cycle_str, transient_prices=transient_str,
+                    )
+                    st.session_state[save_key] = save_id
+
+            else:
+                st.info("No cycle detected. Try training for more steps.")
