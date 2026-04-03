@@ -416,17 +416,6 @@ def render_trajectory_econ(config: dict) -> None:  # noqa: ARG001
                         st.metric("Station B: Δ", f"{delta_b:.2f}")
                     st.caption(f"Avg price: {avg_p2:.2f}  |  Avg profit: {avg_profit_b:.3f}")
 
-                # Interpretation
-                avg_delta = (delta_a + delta_b) / 2 if not (np.isnan(delta_a) or np.isnan(delta_b)) else 0
-                if avg_delta > 0.7:
-                    st.error(f"**Strong collusion.** Both firms earn well above Nash (Δ ≈ {avg_delta:.2f}).")
-                elif avg_delta > 0.3:
-                    st.warning(f"**Partial collusion.** Prices are above Nash but below full collusion (Δ ≈ {avg_delta:.2f}).")
-                elif avg_delta > 0.05:
-                    st.info(f"**Mild supra-competitive pricing.** Slightly above Nash (Δ ≈ {avg_delta:.2f}).")
-                else:
-                    st.success(f"**Near-competitive.** Close to Nash equilibrium (Δ ≈ {avg_delta:.2f}).")
-
                 # Benchmarks for reference
                 st.caption(
                     f"Benchmarks — Nash: p = {p_e:.2f}, π = {profit_e:.3f}  |  "
