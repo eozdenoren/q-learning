@@ -41,7 +41,7 @@ st.markdown(
     """
 )
 
-tab_1, tab_3, tab_ex = st.tabs(["The Environment", "Training", "Exercises"])
+tab_1, tab_3, tab_ex = st.tabs(["The Environment", "Simulation", "Exercises"])
 # Pricing Battle tab hidden for now — will be introduced later
 
 with tab_1:
@@ -106,10 +106,9 @@ with tab_ex:
         r"""
 ### Exercises
 
-Go to the **Training** tab, train the algorithms until convergence, and investigate
-the questions below. For each exercise, look at the **Pricing Simulation** section
-at the bottom of the Training tab — it computes the converged pricing cycle and
-reports $\Delta$ for each firm automatically.
+Go to the **Simulation** tab, train the algorithms until convergence, and investigate
+the questions below. After training, scroll down to the **Pricing Simulation** section
+— it computes the converged pricing cycle and reports $\Delta$ for each firm.
 
 **Exercise 1: Where do prices end up?**
 
@@ -177,7 +176,8 @@ Compare $m = 7$ (coarse grid) with $m = 15$ (fine grid).
 with tab_3:
 
     st.markdown(
-        "Configure parameters, train the algorithms, then examine the pricing outcomes below."
+        "**1.** Set parameters below. **2.** Click **Train** to run until convergence. "
+        "**3.** Scroll down to see the price trajectory and collusion index Δ."
     )
 
     # Handle Restore Defaults before widgets render

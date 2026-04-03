@@ -344,106 +344,63 @@ def parameters_econ(tab_id: str) -> dict:
         if k not in st.session_state:
             st.session_state[k] = v
 
-    # Row 1: Model Parameters (primary controls students interact with)
-    with st.expander("Model Parameters", expanded=True):
-        col_a, col_d, col_t, col_m = st.columns(4)
+    # Main parameters — the four things students experiment with
+    col_a, col_d, col_t, col_m = st.columns(4)
 
-        with col_a:
-            alpha: float = st.slider(
-                r"$\alpha$ (Learning Rate)",
-                0.0,
-                1.0,
-                step=0.001,
-                key=f"{tab_id}_alpha",
-            )
-        with col_d:
-            delta: float = st.slider(
-                r"$\gamma$ (Discount Factor)",
-                0.0,
-                1.0,
-                step=0.01,
-                key=f"{tab_id}_delta",
-            )
-        with col_t:
-            # Dynamic t range: collusion requires t < 2(v-c)/3
-            _v_cur = st.session_state.get(f"{tab_id}_v", 3.0)
-            _c_cur = st.session_state.get(f"{tab_id}_c", 1.0)
-            _t_max = round(2.0 * (_v_cur - _c_cur) / 3.0, 1)
-            _t_max = max(0.4, _t_max)  # floor so slider is always usable
-            # Clamp current value if it exceeds new max
-            _t_cur = st.session_state.get(f"{tab_id}_t", 1.0)
-            if _t_cur > _t_max:
-                st.session_state[f"{tab_id}_t"] = _t_max
-            t: float = st.slider(
-                r"$t$ (Transport Cost)",
-                0.3,
-                _t_max,
-                step=0.1,
-                key=f"{tab_id}_t",
-                help=f"Degree of product differentiation. High t = weak competition. Low t = fierce competition. Max t = 2(v−c)/3 = {_t_max:.1f}.",
-            )
-        with col_m:
-            m: int = int(st.radio(
-                r"$m$ (Number of Prices)",
-                options=[7, 15],
-                index=[7, 15].index(st.session_state[f"{tab_id}_m"]),
-                key=f"{tab_id}_m",
-                horizontal=True,
-                help="Number of equally spaced prices in the action space.",
-            ))
+    with col_a:
+        alpha: float = st.slider(
+            r"$\alpha$ (Learning Rate)",
+            0.0,
+            1.0,
+            step=0.001,
+            key=f"{tab_id}_alpha",
+            help="How fast each firm adjusts to new information.",
+        )
+    with col_d:
+        delta: float = st.slider(
+            r"$\gamma$ (Discount Factor)",
+            0.0,
+            1.0,
+            step=0.01,
+            key=f"{tab_id}_delta",
+            help="How much firms value future profits. High = patient, low = myopic.",
+        )
+    with col_t:
+        _v_cur = st.session_state.get(f"{tab_id}_v", 3.0)
+        _c_cur = st.session_state.get(f"{tab_id}_c", 1.0)
+        _t_max = round(2.0 * (_v_cur - _c_cur) / 3.0, 1)
+        _t_max = max(0.4, _t_max)
+        _t_cur = st.session_state.get(f"{tab_id}_t", 1.0)
+        if _t_cur > _t_max:
+            st.session_state[f"{tab_id}_t"] = _t_max
+        t: float = st.slider(
+            r"$t$ (Transport Cost)",
+            0.3,
+            _t_max,
+            step=0.1,
+            key=f"{tab_id}_t",
+            help="Product differentiation. High t = loyal customers, weak competition.",
+        )
+    with col_m:
+        m: int = int(st.radio(
+            r"$m$ (Number of Prices)",
+            options=[7, 15],
+            index=[7, 15].index(st.session_state[f"{tab_id}_m"]),
+            key=f"{tab_id}_m",
+            horizontal=True,
+            help="Number of prices each firm can choose from.",
+        ))
 
-        # Second row: beta uses same 4-col grid so it aligns with the row above
-        beta_col1, beta_col2, _, _ = st.columns(4)
-        with beta_col1:
-            beta_mantissa: float = st.number_input(
-                r"$\beta$ (Exploration Decay)",
-                min_value=0.1,
-                max_value=99.9,
-                step=0.1,
-                format="%.1f",
-                key=f"{tab_id}_beta_mantissa",
-                help="Exploration rate decays as ε_t = exp(−β·t). Enter β as mantissa × 10^(exponent).",
-            )
-        with beta_col2:
-            beta_exponent: int = st.number_input(
-                r"× 10^",
-                min_value=-9,
-                max_value=-1,
-                step=1,
-                key=f"{tab_id}_beta_exponent",
-            )
-        beta: float = beta_mantissa * (10.0 ** beta_exponent)
-
-    # Market parameters (fixed defaults, collapsed)
-    with st.expander("Market Parameters ($v$, $c$)", expanded=False):
-        col_v, col_c = st.columns(2)
-
-        with col_v:
-            v: float = st.number_input(
-                r"$v$ (Reservation Value)",
-                min_value=0.1,
-                max_value=20.0,
-                step=0.1,
-                key=f"{tab_id}_v",
-                help="Maximum willingness to pay. Controls the collusion ceiling: p_c = v − t/2. Must satisfy v > c + 3t/2 for collusion to be profitable.",
-            )
-        with col_c:
-            c: float = st.number_input(
-                r"$c$ (Marginal Cost)",
-                min_value=0.0,
-                max_value=10.0,
-                step=0.1,
-                key=f"{tab_id}_c",
-                help="Marginal cost for both firms.",
-            )
-
-    # Calculate and display benchmarks (always visible)
+    # Benchmarks (always visible)
     prices = None
     start_mode = "Randomised"
     fixed_start_p1 = 2.0
     fixed_start_p2 = 2.0
 
-    # Validate: collusion must be more profitable than Nash
+    # Read v, c from session state (defaults set above)
+    v: float = st.session_state.get(f"{tab_id}_v", 3.0)
+    c: float = st.session_state.get(f"{tab_id}_c", 1.0)
+
     if v <= c + 1.5 * t:
         st.warning(
             f"$v$ must be greater than $c + 3t/2 = {c + 1.5*t:.1f}$ for collusion "
@@ -452,58 +409,74 @@ def parameters_econ(tab_id: str) -> dict:
 
     try:
         prices, p_e, p_c, profit_e, profit_c = calculate_prices(t, v, c, m)
-
-        # Format action space for display
-        prices_display = [f"{p:.1f}" for p in prices]
         st.info(
             f"**Nash** $p_e = {p_e:.2f}$, $\\pi_e = {profit_e:.2f}$ | "
-            f"**Collusion** $p_c = {p_c:.2f}$, $\\pi_c = {profit_c:.2f}$ | "
-            f"**Prices** $A$ = {{{', '.join(prices_display)}}}",
+            f"**Collusion** $p_c = {p_c:.2f}$, $\\pi_c = {profit_c:.2f}$",
         )
-
     except Exception as e:
         st.error(f"Error calculating prices: {e}")
         prices = [1.5, 2.0, 2.5, 3.0]
         p_e = 2.0
         p_c = 2.5
 
-    # Advanced parameters (collapsed by default)
-    with st.expander("Advanced Parameters", expanded=False):
-        col_seed, col_check, col_stable, col_max = st.columns([1, 1, 1, 1])
+    # Advanced parameters — β, v, c, seed, convergence settings
+    beta_mantissa: float = st.session_state.get(f"{tab_id}_beta_mantissa", 4.0)
+    beta_exponent: int = st.session_state.get(f"{tab_id}_beta_exponent", -6)
+    beta: float = beta_mantissa * (10.0 ** beta_exponent)
 
+    with st.expander("Advanced Parameters", expanded=False):
+        adv_col1, adv_col2, adv_col3 = st.columns(3)
+        with adv_col1:
+            v = st.number_input(
+                r"$v$ (Reservation Value)",
+                min_value=0.1, max_value=20.0, step=0.1,
+                key=f"{tab_id}_v",
+                help="Willingness to pay. Controls collusion ceiling.",
+            )
+        with adv_col2:
+            c = st.number_input(
+                r"$c$ (Marginal Cost)",
+                min_value=0.0, max_value=10.0, step=0.1,
+                key=f"{tab_id}_c",
+                help="Marginal cost for both firms.",
+            )
+        with adv_col3:
+            beta_mantissa = st.number_input(
+                r"$\beta$ (Exploration Decay)",
+                min_value=0.1, max_value=99.9, step=0.1, format="%.1f",
+                key=f"{tab_id}_beta_mantissa",
+                help="Exploration decays as ε = exp(−β·t). Default 4.0 × 10⁻⁶ works well.",
+            )
+            beta_exponent = st.number_input(
+                r"× 10^",
+                min_value=-9, max_value=-1, step=1,
+                key=f"{tab_id}_beta_exponent",
+            )
+            beta = beta_mantissa * (10.0 ** beta_exponent)
+
+        st.markdown("---")
+        col_seed, col_check, col_stable, col_max = st.columns(4)
         with col_seed:
             seed: int = st.session_state.get(f"{tab_id}_next_seed", 43)
             st.markdown(f"**Random Seed:** {seed}")
-            st.caption("Changes automatically on Reset.")
+            st.caption("Changes on Reset.")
         with col_check:
             check_every: int = st.number_input(
-                "Check Every",
-                min_value=100,
-                max_value=10000,
-                value=1000,
-                step=100,
+                "Check Every", min_value=100, max_value=10000, value=1000, step=100,
                 key=f"{tab_id}_check_every",
                 help="Check policy stability every N steps",
             )
         with col_stable:
             stable_required: int = st.number_input(
-                "Stable Required",
-                min_value=1000,
-                max_value=1000000,
-                value=100000,
-                step=10000,
+                "Stable Required", min_value=1000, max_value=1000000, value=100000, step=10000,
                 key=f"{tab_id}_stable_required",
-                help="Number of stable steps required for convergence",
+                help="Steps of stable policy required for convergence",
             )
         with col_max:
             max_periods: int = st.number_input(
-                "Max Periods",
-                min_value=10000,
-                max_value=10000000,
-                value=5000000,
-                step=100000,
+                "Max Periods", min_value=10000, max_value=10000000, value=5000000, step=100000,
                 key=f"{tab_id}_max_periods",
-                help="Maximum number of steps before stopping",
+                help="Maximum training steps",
             )
 
     return {
