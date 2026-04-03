@@ -27,7 +27,7 @@ st.set_page_config(page_title="The Dog & The Bone – Q-Learning", layout="wide"
 
 st.title("The Dog & The Bone")
 
-tab_env, tab_exercises = st.tabs(["The Environment", "Exercises"])
+tab_env, tab_sim, tab_exercises = st.tabs(["The Environment", "Simulation", "Exercises"])
 
 # ==============================================================================
 # TAB 1: THE ENVIRONMENT
@@ -106,13 +106,14 @@ different directions.
 # ==============================================================================
 # TAB 2: EXERCISES
 # ==============================================================================
-with tab_exercises:
+# ==============================================================================
+# TAB 2: SIMULATION
+# ==============================================================================
+with tab_sim:
     st.markdown(
         """
-### Instructions
-
-Use the simulation below to complete the exercises. For each exercise, record your
-answer — you will be asked to share your findings with the class.
+Use the simulation to watch Luna learn. Step through episodes one step at a time,
+or fast-forward to see the converged Q-table.
         """
     )
 
@@ -192,8 +193,10 @@ answer — you will be asked to share your findings with the class.
         st.session_state[autoplay_pending_key] = False
         st.rerun()
 
-    # --- Exercises ---
-    st.markdown("---")
+# ==============================================================================
+# TAB 3: EXERCISES
+# ==============================================================================
+with tab_exercises:
     st.markdown(
         r"""
 ### Exercise 1: Watch Learning Spread
