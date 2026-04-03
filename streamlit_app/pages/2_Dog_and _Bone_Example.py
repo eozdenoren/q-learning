@@ -112,12 +112,6 @@ with st.expander("Optimal Actions", expanded=True):
 with st.expander("Evolving Q-Values", expanded=False):
     render_q_history_chart(display_state_1d["q_history_plot"])
 
-with st.expander("Steps per Episode", expanded=False):
-    render_steps_chart(
-        display_state_1d["steps_per_episode"],
-        display_state_1d["q_history_plot"],
-    )
-
 autoplay_pending_key = f"{config_tab1.get('tab_id', 'tab1')}_autoplay_pending_rerun"
 if st.session_state.get(autoplay_pending_key, False):
     st.session_state[autoplay_pending_key] = False

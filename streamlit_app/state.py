@@ -327,8 +327,16 @@ def run_batch_training(episodes_to_run: int, config: dict) -> None:
     epsilon = config["epsilon"]
     reward_val = config["reward_val"]
 
+    # Fast batch training: use numpy arrays instead of pandas for inner loop
+    q_df = st.session_state[f"{tab_id}_q_table"]
+    states_list = list(range(start_pos, end_pos + 1))
+    n_states = len(states_list)
+    state_to_idx = {s: i for i, s in enumerate(states_list)}
+    # Q array: rows = states, cols = [L, R]
+    q_arr = q_df.values.copy().astype(np.float64)
+
     for i in range(episodes_to_run):
-        # Internal reset for batch training (doesn't change ready flag)
+        # Internal reset for batch training
         if (
             st.session_state[f"{tab_id}_is_terminal"]
             or st.session_state[f"{tab_id}_current_state"] == goal_pos
@@ -345,32 +353,29 @@ def run_batch_training(episodes_to_run: int, config: dict) -> None:
             st.session_state[f"{tab_id}_is_terminal"] = False
 
         curr_s = st.session_state[f"{tab_id}_current_state"]
-        episode_start = curr_s  # Track start of this batch episode
+        episode_start = curr_s
         steps = 0
 
         while curr_s != goal_pos and steps < 100:
-            # Epsilon-greedy
+            si = state_to_idx[curr_s]
+            # Epsilon-greedy using numpy array
             if np.random.rand() < epsilon:
-                a = np.random.choice(ACTIONS_1D)
+                a_idx = np.random.randint(2)  # 0=L, 1=R
             else:
-                qs = st.session_state[f"{tab_id}_q_table"].loc[curr_s]
-                max_q = qs.max()
-                a = np.random.choice(qs[qs == max_q].index.tolist())
+                row = q_arr[si]
+                a_idx = np.random.choice(np.flatnonzero(row == row.max()))
 
             # Step
-            move = -1 if a == "L" else 1
+            move = -1 if a_idx == 0 else 1
             next_s = max(start_pos, min(end_pos, curr_s + move))
             done = next_s == goal_pos
             r = reward_val if done else 0.0
 
-            # Update
-            old_v = st.session_state[f"{tab_id}_q_table"].at[curr_s, a]
-            max_next = (
-                0.0 if done else st.session_state[f"{tab_id}_q_table"].loc[next_s].max()
-            )
-            new_v = old_v + alpha * (r + gamma * max_next - old_v)
-            st.session_state[f"{tab_id}_q_table"].at[curr_s, a] = new_v
-            st.session_state[f"{tab_id}_agent"].Q[(curr_s, a)] = new_v
+            # Update using numpy array
+            ni = state_to_idx[next_s]
+            old_v = q_arr[si, a_idx]
+            max_next = 0.0 if done else q_arr[ni].max()
+            q_arr[si, a_idx] = old_v + alpha * (r + gamma * max_next - old_v)
 
             curr_s = next_s
             steps += 1
@@ -379,14 +384,18 @@ def run_batch_training(episodes_to_run: int, config: dict) -> None:
         st.session_state[f"{tab_id}_current_state"] = curr_s
         st.session_state[f"{tab_id}_is_terminal"] = True
 
-        # Log episode data
         record_episode(config, steps, episode_start, curr_s)
-
-        # Record steps for this completed episode
         st.session_state[f"{tab_id}_steps_per_episode"].append(steps)
-
         st.session_state[f"{tab_id}_total_episodes"] += 1
-        progress_bar.progress((i + 1) / episodes_to_run)
+        if episodes_to_run <= 100 or (i + 1) % max(1, episodes_to_run // 20) == 0:
+            progress_bar.progress((i + 1) / episodes_to_run)
+
+    # Write numpy array back to DataFrame and agent Q-dict
+    q_df.iloc[:, :] = q_arr
+    agent = st.session_state[f"{tab_id}_agent"]
+    for si, s in enumerate(states_list):
+        for ai, a in enumerate(ACTIONS_1D):
+            agent.Q[(s, a)] = q_arr[si, ai]
 
     # Record Q-history only once after all batch episodes complete (performance optimization)
     record_q_history(config)
