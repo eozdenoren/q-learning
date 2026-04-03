@@ -190,7 +190,7 @@ with tab_3:
         st.session_state["training_m"] = 15
         st.session_state["training_beta_mantissa"] = 4.0
         st.session_state["training_beta_exponent"] = -6
-        st.session_state["training_v"] = 3.0
+        st.session_state["training_v"] = 4.5
         st.session_state["training_c"] = 1.0
         st.session_state["training_check_every"] = 1000
         st.session_state["training_stable_required"] = 100000

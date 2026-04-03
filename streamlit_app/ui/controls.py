@@ -336,7 +336,7 @@ def parameters_econ(tab_id: str) -> dict:
         f"{tab_id}_m": 15,
         f"{tab_id}_beta_mantissa": 4.0,
         f"{tab_id}_beta_exponent": -6,
-        f"{tab_id}_v": 3.0,
+        f"{tab_id}_v": 4.5,
         f"{tab_id}_c": 1.0,
     }
     # Seed session state with defaults for any key not yet set
