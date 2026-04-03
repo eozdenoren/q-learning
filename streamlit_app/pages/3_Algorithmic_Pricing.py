@@ -237,6 +237,10 @@ with tab_3:
             if not st.session_state.get(f"{tab_id}_starting_prices_picked", False):
                 pick_random_starting_prices_econ(config_demo)
             run_until_convergence_econ(config_demo)
+            # Auto-change seed so next Reset gives a different run
+            import os
+            new_seed = int.from_bytes(os.urandom(3), "big") % 1000000
+            st.session_state[f"{tab_id}_next_seed"] = new_seed
             st.rerun()
     with col_multi_n:
         n_runs = st.number_input(
