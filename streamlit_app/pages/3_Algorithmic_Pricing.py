@@ -109,12 +109,12 @@ with tab_ex:
 Go to the **Simulation** tab to run experiments. For each exercise:
 
 1. Set the parameters as instructed
-2. Click **Train the Model** to run until convergence
-3. Click **Simulate Pricing** to see the converged prices and $\Delta$ values
-4. The seed changes automatically after each run — click **Reset / Initialize** before the next run
+2. Click **Reset / Initialize** (this clears the previous run and starts fresh)
+3. Click **Train the Model** to run until convergence
+4. Click **Simulate Pricing** to see the converged prices and $\Delta$ values
 
 Each simulation is automatically recorded in the **Experiment Log** at the bottom
-of the Simulation tab. You can download it as a CSV file at any time.
+of the Simulation tab. You can download your results as a CSV file at any time.
 
 ---
 
