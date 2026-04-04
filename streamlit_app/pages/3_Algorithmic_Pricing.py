@@ -186,13 +186,8 @@ better price. In the model, $t$ decreases.
 **Run 100 simulations at each of:** $t = 1.0$ (before), $t = 0.5$ (after bypass).
 
 **Report:**
-- Average $\Delta$ at each $t$. Does collusion get weaker when switching is
-  easier — as standard competition theory would predict?
-- Or does something surprising happen? If so, why?
-
-> *Hint: when $t$ is small, competitive profits ($\pi_e = t/2$) are tiny but
-> collusive profits remain large. The relative gain from collusion is enormous.
-> Does this help explain what you observe?*
+- Average $\Delta$, standard deviation, and $|\Delta_1 - \Delta_2|$ at each $t$
+- Does the bypass road help consumers? Explain your finding.
 
 ---
 
