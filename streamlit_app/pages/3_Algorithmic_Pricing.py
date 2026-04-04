@@ -150,9 +150,7 @@ returns. In Q-learning terms, $\gamma$ has dropped.
 - At what $\gamma$ does collusion effectively disappear ($\Delta \approx 0$)?
 - How does the variance change as $\gamma$ falls?
 
-> *Think about it: a patient algorithm cares about the rival's retaliation
-> tomorrow. A myopic one grabs today's profit and ignores the consequences.
-> What does this imply about the design of pricing software?*
+> *What does this imply about the design of pricing software?*
 
 ---
 
@@ -204,10 +202,8 @@ $v$ decreases. (Open **Advanced Parameters** to change $v$.)
 - Does collusion weaken when drivers have alternatives?
 - Are the outcomes more asymmetric at low $v$? Why might that be?
 
-> *Think about it: with high $v$, fuel is essential and there is a large gap
-> between competitive and collusive profits. With low $v$, the gap shrinks.
-> This is why regulators worry most about algorithmic pricing in markets for
-> essential goods.*
+> *What does this imply about which markets are most vulnerable to
+> algorithmic collusion?*
 
 ---
 
@@ -223,11 +219,7 @@ simplify things for consumers. In the model, $m$ decreases.
 - Average $\Delta$ at each $m$
 - Does a coarser grid help or hurt consumers?
 
-> *Think about it: with fewer prices, the smallest possible undercut is a
-> large price drop. If you can only cut from €3.00 to €2.50 (not €2.99),
-> the short-term gain from cheating is small relative to the punishment.
-> Coarse pricing acts as a commitment device — it makes gradual undercutting
-> impossible.*
+> *Would this regulation achieve its intended goal?*
 
 ---
 
