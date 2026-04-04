@@ -187,7 +187,7 @@ better price. In the model, $t$ decreases.
 
 **Report:**
 - Average $\Delta$, standard deviation, and $|\Delta_1 - \Delta_2|$ at each $t$
-- Does the bypass road help consumers? Explain your finding.
+- How does the bypass road affect collusion? Explain your finding.
 
 ---
 
