@@ -109,106 +109,146 @@ with tab_ex:
 Go to the **Simulation** tab to run experiments. For each exercise:
 
 1. Set the parameters as instructed
-2. Click **Train** — this automatically resets with a new random seed and trains until convergence
-3. Click **Simulate Pricing** to see the converged prices and $\Delta$ values
-
-**Batch runs:** To run multiple experiments at once, set the number of runs and
-click **Train N Runs**. Each run uses a different random seed and is automatically
-logged.
+2. Click **Train** to run a single experiment (it auto-resets each time)
+3. To run many experiments at once, use **Train N Runs** (default: 100)
 
 All results are recorded in the **Experiment Log** at the bottom of the
 Simulation tab. You can download your results as a CSV file.
 
----
-
-### Exercise 1: Baseline — where do prices end up?
-
-**Parameters:** defaults ($\alpha = 0.15$, $\gamma = 0.95$, $t = 1.0$, $m = 15$).
-
-**Run 100 simulations** (use "Train 100 Runs").
-
-**Report:** What is the average $\Delta$ across your runs? Do the firms converge
-to Nash ($\Delta = 0$), full collusion ($\Delta = 1$), or somewhere in between?
-How much variation is there across runs?
+For each exercise, report: **(i)** average $\Delta$, **(ii)** standard deviation
+of $\Delta$, and **(iii)** average asymmetry $|\Delta_1 - \Delta_2|$ (how often the
+two stations end up with different profit levels).
 
 ---
 
-### Exercise 2: The role of patience ($\gamma$)
+### Exercise 1: The status quo
 
-**Run 100 simulations at each of the following values of $\gamma$**
-(change $\gamma$, then use "Train 100 Runs"):
-- $\gamma = 0.95$ (patient — default)
-- $\gamma = 0.50$ (moderately myopic)
+Klaus and Markus have both installed algorithmic pricing software.
+Their town has moderate switching costs ($t = 1.0$) and fuel is a necessity
+($v = 4.5$). What happens?
 
-**Report:** How does the average $\Delta$ change when $\gamma$ falls? Does collusion
-break down? At what level of $\gamma$ do you first see $\Delta$ close to zero?
+**Run 100 simulations** with default parameters.
 
-> *Hint: if a firm undercuts today, the rival reacts tomorrow. A patient firm
-> cares about that retaliation; a myopic firm does not.*
-
----
-
-### Exercise 3: What sustains collusion?
-
-**Run 1 simulation** with defaults ($\gamma = 0.95$). After training:
-
-- **Simulate** starting from the converged prices. Confirm the cycle is stable.
-- **Simulate again** starting from a state where one firm undercuts (set one firm's
-  starting price to the Nash price while the other stays at the converged price).
-
-**Report:** Does the rival retaliate? How many steps until prices recover?
-The algorithms were never programmed to punish — how does punishment emerge?
+**Report:**
+- Average $\Delta$ and standard deviation
+- Average $|\Delta_1 - \Delta_2|$: do both stations benefit equally, or does one
+  sometimes do much better than the other?
+- Do the algorithms learn to collude, compete, or something in between?
 
 ---
 
-### Exercise 4: How differentiated are the products?
+### Exercise 2: A new generation of software
 
-The parameter $t$ controls switching costs (product differentiation).
+The software provider releases a major update. The new version uses a shorter
+planning horizon — it optimises for near-term profit rather than long-run
+returns. In Q-learning terms, $\gamma$ has dropped.
 
-**Run 100 simulations at each of:**
-- $t = 1.0$ (default — moderate differentiation)
-- $t = 0.5$ (low differentiation — easy to switch)
+**Run 100 simulations at each of:** $\gamma = 0.95$, $0.80$, $0.50$, $0.10$.
 
-**Report:** How does the average $\Delta$ change with $t$?
+**Report:**
+- Average $\Delta$, standard deviation, and $|\Delta_1 - \Delta_2|$ at each $\gamma$
+- At what $\gamma$ does collusion effectively disappear ($\Delta \approx 0$)?
+- How does the variance change as $\gamma$ falls?
 
----
-
-### Exercise 5: How essential is the product?
-
-The parameter $v$ controls willingness to pay. Open **Advanced Parameters** to change $v$.
-
-**Run 100 simulations at each of:**
-- $v = 4.5$ (default)
-- $v = 3.0$ (just above the threshold)
-
-**Report:** How does $\Delta$ change? Why might regulators worry more about
-algorithmic pricing for essential goods (high $v$)?
+> *Think about it: a patient algorithm cares about the rival's retaliation
+> tomorrow. A myopic one grabs today's profit and ignores the consequences.
+> What does this imply about the design of pricing software?*
 
 ---
 
-### Exercise 6: Does the number of prices matter?
+### Exercise 3: What happens if one station undercuts?
 
-The parameter $m$ controls how many prices each firm can choose from.
+Klaus is tempted to manually override his algorithm and slash prices to grab
+market share. Will Markus's algorithm retaliate?
 
-**Run 100 simulations at each of:**
-- $m = 15$ (fine grid — default)
-- $m = 7$ (coarse grid)
+**Run 3 separate training runs** with defaults ($\gamma = 0.95$). For each, after
+training:
 
-**Report:** Does a coarser grid make collusion easier or harder? Why?
+1. **Simulate** starting from the converged prices. Confirm the cycle is stable.
+2. **Simulate** with Station A at the converged price and Station B at the
+   Nash price ($p_e$). Does Station A retaliate? How many steps to recover?
+3. **Simulate** with Station A at the converged price and Station B at the
+   lowest price on the grid. What happens?
 
-> *Hint: with fewer prices, the smallest possible undercut is a big price drop.*
+**Report:**
+- In each case, does retaliation occur? How many steps until prices recover?
+- The algorithms were never programmed to punish. How does punishment emerge
+  from Q-learning alone?
 
 ---
 
-### Exercise 7: The big picture
+### Exercise 4: A bypass road is built
 
-No one programmed these firms to collude. They never communicated. Each one
-simply maximised its own discounted profit by trial and error.
+The town council builds a bypass road that makes it easier for drivers to
+cross town. Switching costs fall — drivers will now drive further for a
+better price. In the model, $t$ decreases.
 
-Based on your experiments:
-- **Write down** the key ingredients for supra-competitive pricing to emerge.
-- **Answer:** Should competition authorities be concerned about algorithmic pricing?
-  What makes this different from human tacit collusion?
+**Run 100 simulations at each of:** $t = 1.0$ (before), $t = 0.5$ (after bypass).
+
+**Report:**
+- Average $\Delta$ at each $t$. Does collusion get weaker when switching is
+  easier — as standard competition theory would predict?
+- Or does something surprising happen? If so, why?
+
+> *Hint: when $t$ is small, competitive profits ($\pi_e = t/2$) are tiny but
+> collusive profits remain large. The relative gain from collusion is enormous.
+> Does this help explain what you observe?*
+
+---
+
+### Exercise 5: An electric charging station opens nearby
+
+A new electric vehicle charging station opens on the main road, giving drivers
+an alternative to petrol. Willingness to pay for fuel drops. In the model,
+$v$ decreases. (Open **Advanced Parameters** to change $v$.)
+
+**Run 100 simulations at each of:** $v = 4.5$ (before), $v = 3.0$ (after).
+
+**Report:**
+- Average $\Delta$ and $|\Delta_1 - \Delta_2|$ at each $v$
+- Does collusion weaken when drivers have alternatives?
+- Are the outcomes more asymmetric at low $v$? Why might that be?
+
+> *Think about it: with high $v$, fuel is essential and there is a large gap
+> between competitive and collusive profits. With low $v$, the gap shrinks.
+> This is why regulators worry most about algorithmic pricing in markets for
+> essential goods.*
+
+---
+
+### Exercise 6: A regulation on pricing precision
+
+The government considers requiring petrol stations to set prices in coarser
+increments (e.g., 5-cent steps instead of 1-cent steps). The idea is to
+simplify things for consumers. In the model, $m$ decreases.
+
+**Run 100 simulations at each of:** $m = 15$ (fine grid), $m = 7$ (coarse grid).
+
+**Report:**
+- Average $\Delta$ at each $m$
+- Does a coarser grid help or hurt consumers?
+
+> *Think about it: with fewer prices, the smallest possible undercut is a
+> large price drop. If you can only cut from €3.00 to €2.50 (not €2.99),
+> the short-term gain from cheating is small relative to the punishment.
+> Coarse pricing acts as a commitment device — it makes gradual undercutting
+> impossible.*
+
+---
+
+### Exercise 7: Policy brief
+
+You are advising Germany's Federal Cartel Office. Based on your experiments,
+write a short brief (5–10 bullet points) addressing:
+
+- Under what conditions do pricing algorithms learn supra-competitive prices?
+- What are the key ingredients? (Think: patience, market structure, pricing
+  precision, product essentialness.)
+- Should the Cartel Office be concerned? What makes algorithmic tacit collusion
+  different from human tacit collusion?
+- What policy interventions might help — and which might backfire?
+  (Consider: banning algorithms, mandating coarser/finer pricing, transparency
+  requirements, shorter planning horizons.)
         """
     )
 
