@@ -104,72 +104,111 @@ also learning — permanent exploration would prevent convergence.
 with tab_ex:
     st.markdown(
         r"""
-### Exercises
+### Instructions
 
-Go to the **Simulation** tab, train the algorithms until convergence, and investigate
-the questions below. After training, scroll down to the **Pricing Simulation** section
-— it computes the converged pricing cycle and reports $\Delta$ for each firm.
+Go to the **Simulation** tab to run experiments. For each exercise:
 
-**Exercise 1: Where do prices end up?**
+1. Set the parameters as instructed
+2. Click **Train the Model** to run until convergence
+3. Click **Simulate Pricing** to see the converged prices and $\Delta$ values
+4. The seed changes automatically after each run — click **Reset / Initialize** before the next run
 
-Train with the default parameters and run until convergence.
-- **Write down** the converged prices and $\Delta$ values for each firm.
-- Do the firms converge to $p_e$, $p_c$, or somewhere in between?
-- **Reset** and train again (the random seed changes). **Write down** the new $\Delta$ values.
-  Try 3 runs total. How variable are the results?
-
-**Exercise 2: The role of patience ($\gamma$)**
-
-The discount factor $\gamma$ controls how much each firm weighs future profits
-versus today's — exactly the same role it played for Luna.
-- Train with $\gamma = 0.95$ (default). **Write down** $\Delta$.
-- **Reset**, set $\gamma = 0.5$, train again. **Write down** $\Delta$.
-- **Answer:** Does collusion break down when firms become less patient? Why?
-
-> *Hint: if a firm undercuts today, the rival reacts tomorrow. A patient
-> firm cares about that retaliation; a myopic firm does not.*
-
-**Exercise 3: What sustains collusion?**
-
-Use $\gamma = 0.95$ and train until convergence. Then use the Pricing Simulation
-to test what happens after a deviation.
-- **Step 1:** Simulate starting from the converged prices. Confirm the cycle is stable.
-- **Step 2:** Simulate starting from a state where one firm plays the converged price
-  and the other undercuts (e.g., to Nash price). **Write down:** Does the rival retaliate?
-  How many steps until prices recover?
-- **Answer:** The algorithms were never programmed to punish. How does punishment
-  emerge from Q-learning?
-
-**Exercise 4: The big picture**
-
-No one programmed these firms to collude. They never communicated. Each one
-simply maximised its own discounted profit by trial and error.
-- **Write down:** What are the key ingredients for supra-competitive pricing to emerge?
-- **Answer:** Should competition authorities be concerned about algorithmic pricing?
-  What makes this different from human tacit collusion?
+Each simulation is automatically recorded in the **Experiment Log** at the bottom
+of the Simulation tab. You can download it as a CSV file at any time.
 
 ---
 
-**Optional exercises** *(for further exploration)*
+### Exercise 1: Baseline — where do prices end up?
 
-**Exercise A: How differentiated are the products?**
+**Parameters:** defaults ($\alpha = 0.15$, $\gamma = 0.95$, $t = 1.0$, $m = 15$).
 
-The parameter $t$ controls product differentiation (transport cost / switching cost).
-- Train with $t = 1.0$ (default). Note $\Delta$.
-- Try $t = 0.5$ (easier to switch). How does $\Delta$ change?
-- Try increasing $m$ to compensate for the coarser grid at low $t$. Does $\Delta$ fall?
+**Run 3 simulations.** For each, record $\Delta_A$ and $\Delta_B$.
 
-**Exercise B: How essential is the product?**
+**Report:** What is the average $\Delta$ across your runs? Do the firms converge
+to Nash ($\Delta = 0$), full collusion ($\Delta = 1$), or somewhere in between?
+How much variation is there across runs?
 
-The parameter $v$ controls willingness to pay.
-- Try $v = 2.6$ (just above the threshold). Is there any collusion?
-- Try $v = 5.0$. How does $\Delta$ change?
-- Why do regulators worry more about algorithmic pricing for essential goods?
+---
 
-**Exercise C: Does the number of prices matter?**
+### Exercise 2: The role of patience ($\gamma$)
 
-Compare $m = 7$ (coarse grid) with $m = 15$ (fine grid).
-- Does a finer grid make collusion harder? Why?
+**Run 3 simulations at each of the following values of $\gamma$:**
+- $\gamma = 0.95$ (patient — default)
+- $\gamma = 0.50$ (moderately myopic)
+
+Keep all other parameters at their defaults. Reset before each run.
+
+**Report:** How does the average $\Delta$ change when $\gamma$ falls? Does collusion
+break down? At what level of $\gamma$ do you first see $\Delta$ close to zero?
+
+> *Hint: if a firm undercuts today, the rival reacts tomorrow. A patient firm
+> cares about that retaliation; a myopic firm does not.*
+
+---
+
+### Exercise 3: What sustains collusion?
+
+**Run 1 simulation** with defaults ($\gamma = 0.95$). After training:
+
+- **Simulate** starting from the converged prices. Confirm the cycle is stable.
+- **Simulate again** starting from a state where one firm undercuts (set one firm's
+  starting price to the Nash price while the other stays at the converged price).
+
+**Report:** Does the rival retaliate? How many steps until prices recover?
+The algorithms were never programmed to punish — how does punishment emerge?
+
+---
+
+### Exercise 4: How differentiated are the products?
+
+The parameter $t$ controls switching costs (product differentiation).
+
+**Run 3 simulations at each of:**
+- $t = 1.0$ (default — moderate differentiation)
+- $t = 0.5$ (low differentiation — easy to switch)
+
+Keep all other parameters at defaults.
+
+**Report:** How does $\Delta$ change with $t$? Is the effect consistent across runs?
+
+---
+
+### Exercise 5: How essential is the product?
+
+The parameter $v$ controls willingness to pay. Open **Advanced Parameters** to change $v$.
+
+**Run 3 simulations at each of:**
+- $v = 4.5$ (default)
+- $v = 3.0$ (just above the threshold)
+
+**Report:** How does $\Delta$ change? Why might regulators worry more about
+algorithmic pricing for essential goods (high $v$)?
+
+---
+
+### Exercise 6: Does the number of prices matter?
+
+The parameter $m$ controls how many prices each firm can choose from.
+
+**Run 3 simulations at each of:**
+- $m = 15$ (fine grid — default)
+- $m = 7$ (coarse grid)
+
+**Report:** Does a coarser grid make collusion easier or harder? Why?
+
+> *Hint: with fewer prices, the smallest possible undercut is a big price drop.*
+
+---
+
+### Exercise 7: The big picture
+
+No one programmed these firms to collude. They never communicated. Each one
+simply maximised its own discounted profit by trial and error.
+
+Based on your experiments:
+- **Write down** the key ingredients for supra-competitive pricing to emerge.
+- **Answer:** Should competition authorities be concerned about algorithmic pricing?
+  What makes this different from human tacit collusion?
         """
     )
 
