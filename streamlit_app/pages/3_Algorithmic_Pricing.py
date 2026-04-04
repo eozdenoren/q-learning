@@ -109,12 +109,15 @@ with tab_ex:
 Go to the **Simulation** tab to run experiments. For each exercise:
 
 1. Set the parameters as instructed
-2. Click **Reset / Initialize** (this clears the previous run and starts fresh)
-3. Click **Train the Model** to run until convergence
-4. Click **Simulate Pricing** to see the converged prices and $\Delta$ values
+2. Click **Train** — this automatically resets with a new random seed and trains until convergence
+3. Click **Simulate Pricing** to see the converged prices and $\Delta$ values
 
-Each simulation is automatically recorded in the **Experiment Log** at the bottom
-of the Simulation tab. You can download your results as a CSV file at any time.
+**Batch runs:** To run multiple experiments at once, set the number of runs and
+click **Train N Runs**. Each run uses a different random seed and is automatically
+logged.
+
+All results are recorded in the **Experiment Log** at the bottom of the
+Simulation tab. You can download your results as a CSV file.
 
 ---
 
@@ -122,7 +125,7 @@ of the Simulation tab. You can download your results as a CSV file at any time.
 
 **Parameters:** defaults ($\alpha = 0.15$, $\gamma = 0.95$, $t = 1.0$, $m = 15$).
 
-**Run 3 simulations.** For each, record $\Delta_A$ and $\Delta_B$.
+**Run 100 simulations** (use "Train 100 Runs").
 
 **Report:** What is the average $\Delta$ across your runs? Do the firms converge
 to Nash ($\Delta = 0$), full collusion ($\Delta = 1$), or somewhere in between?
@@ -132,11 +135,10 @@ How much variation is there across runs?
 
 ### Exercise 2: The role of patience ($\gamma$)
 
-**Run 3 simulations at each of the following values of $\gamma$:**
+**Run 100 simulations at each of the following values of $\gamma$**
+(change $\gamma$, then use "Train 100 Runs"):
 - $\gamma = 0.95$ (patient — default)
 - $\gamma = 0.50$ (moderately myopic)
-
-Keep all other parameters at their defaults. Reset before each run.
 
 **Report:** How does the average $\Delta$ change when $\gamma$ falls? Does collusion
 break down? At what level of $\gamma$ do you first see $\Delta$ close to zero?
@@ -163,13 +165,11 @@ The algorithms were never programmed to punish — how does punishment emerge?
 
 The parameter $t$ controls switching costs (product differentiation).
 
-**Run 3 simulations at each of:**
+**Run 100 simulations at each of:**
 - $t = 1.0$ (default — moderate differentiation)
 - $t = 0.5$ (low differentiation — easy to switch)
 
-Keep all other parameters at defaults.
-
-**Report:** How does $\Delta$ change with $t$? Is the effect consistent across runs?
+**Report:** How does the average $\Delta$ change with $t$?
 
 ---
 
@@ -177,7 +177,7 @@ Keep all other parameters at defaults.
 
 The parameter $v$ controls willingness to pay. Open **Advanced Parameters** to change $v$.
 
-**Run 3 simulations at each of:**
+**Run 100 simulations at each of:**
 - $v = 4.5$ (default)
 - $v = 3.0$ (just above the threshold)
 
@@ -190,7 +190,7 @@ algorithmic pricing for essential goods (high $v$)?
 
 The parameter $m$ controls how many prices each firm can choose from.
 
-**Run 3 simulations at each of:**
+**Run 100 simulations at each of:**
 - $m = 15$ (fine grid — default)
 - $m = 7$ (coarse grid)
 
@@ -245,57 +245,42 @@ with tab_3:
         init_session_state_econ(config_demo)
         pick_random_starting_prices_econ(config_demo)
 
-    # Buttons: Reset, Train, Multi-run, Restore Defaults
-    col_reset, col_train, col_multi_n, col_multi_run, col_defaults = st.columns([1.2, 1.2, 0.8, 1.2, 1.2])
-    with col_reset:
+    # Buttons
+    col_train, col_multi_n, col_multi_run, col_defaults = st.columns([1.5, 0.8, 1.5, 1.2])
+    with col_train:
         if st.button(
-            "Reset / Initialize",
-            type="secondary",
-            key="demo_reset",
-            help="Reset the model with the current parameters. Picks random starting prices automatically.",
+            "Train",
+            type="primary",
+            key="demo_train",
+            help="Resets the model with a new random seed, trains until convergence, then stops.",
         ):
-            # Random seed so each reset gives a different run
             import os
-            new_seed = int.from_bytes(os.urandom(3), "big") % 1000000
             tab_id = config_demo.get("tab_id", "training")
+            # Auto-reset with new seed before training
+            new_seed = int.from_bytes(os.urandom(3), "big") % 1000000
             st.session_state[f"{tab_id}_next_seed"] = new_seed
             config_demo["seed"] = new_seed
             config_demo["start_mode"] = "Randomised"
             init_session_state_econ(config_demo)
             pick_random_starting_prices_econ(config_demo)
-            st.rerun()
-    with col_train:
-        if st.button(
-            "Train the Model",
-            type="primary",
-            key="demo_train",
-            help="Run training until the greedy policy is stable, then stop.",
-        ):
-            # Ensure starting prices are picked
-            tab_id = config_demo.get("tab_id", "training")
-            if not st.session_state.get(f"{tab_id}_starting_prices_picked", False):
-                pick_random_starting_prices_econ(config_demo)
+            # Train
             run_until_convergence_econ(config_demo)
-            # Auto-change seed so next Reset gives a different run
-            import os
-            new_seed = int.from_bytes(os.urandom(3), "big") % 1000000
-            st.session_state[f"{tab_id}_next_seed"] = new_seed
             st.rerun()
     with col_multi_n:
         n_runs = st.number_input(
             "# runs",
             min_value=1,
-            max_value=50,
-            value=5,
-            step=1,
+            max_value=500,
+            value=100,
+            step=10,
             key="multi_n_runs",
         )
     with col_multi_run:
         run_multi = st.button(
-            f"Train {n_runs} Seeds",
+            f"Train {n_runs} Runs",
             type="primary",
             key="multi_run_btn",
-            help="Train the model with multiple random seeds using the current parameters. Each run is saved to the experiment log.",
+            help="Train the model multiple times with different random seeds. Results are saved to the experiment log.",
         )
     with col_defaults:
         if st.button(
